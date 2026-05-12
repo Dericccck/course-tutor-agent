@@ -88,6 +88,25 @@ python main.py
 - 使用一个测试问题进行检索
 - 输出命中的课程资料标题、分数、来源和摘要片段
 
+## 环境变量
+
+项目后续会同时支持两种模型接入方式：
+- `OpenAI API`
+- `GitHub Models`（通过 `GITHUB_TOKEN` 和 OpenAI 兼容接口）
+
+示例配置见 `.env.example`：
+
+```env
+LLM_PROVIDER=github
+MODEL_NAME=gpt-4.1-mini
+OPENAI_API_KEY=
+OPENAI_BASE_URL=
+GITHUB_TOKEN=
+GITHUB_MODELS_BASE_URL=https://models.inference.ai.azure.com/
+COURSE_SOURCE_ROOT=/Users/a1-6/Desktop/AIAgent/code
+RETRIEVAL_TOP_K=5
+```
+
 ## 下一步计划
 
 接下来会按以下顺序继续完善：
