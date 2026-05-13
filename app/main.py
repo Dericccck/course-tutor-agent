@@ -14,16 +14,20 @@ if __name__ == "__main__":
 
     # question = "tool use 是什么， 和 agent 有什么关系？"
     question = input("请输入你的问题：").strip()
-    result = ask_course_agent(question, documents, settings=settings)
+    
+    if not question:
+        print("问题不能为空。")
+    else:
+        result = ask_course_agent(question, documents, settings=settings)
 
-    print(f"\nQuestion: {question}\n")
-    print("Answer:")
-    print(result.answer)
+        print(f"\nQuestion: {question}\n")
+        print("Answer:")
+        print(result.answer)
 
-    print("\nSuggestions:")
-    for suggestion in result.suggestions:
-        print(f"- {suggestion}")
+        print("\nSuggestions:")
+        for suggestion in result.suggestions:
+            print(f"- {suggestion}")
 
-    print("\nSources:")
-    for source in result.sources:
-        print(f"- {source}")
+        print("\nSources:")
+        for source in result.sources:
+            print(f"- {source}")

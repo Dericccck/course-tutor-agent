@@ -57,7 +57,7 @@ def ask_course_agent(question: str, documents: list[Document], settings: Setting
             sources=[chunk.source for chunk in retrieved_chunks],
         )
     
-    # if not answer.sources:
-    #     answer.sources = [chunk.source for chunk in retrieved_chunks]
+    if not answer.sources:
+        answer.sources = [chunk.source for chunk in retrieved_chunks]
 
     return answer
