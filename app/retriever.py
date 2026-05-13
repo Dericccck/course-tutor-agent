@@ -18,6 +18,8 @@ def score_document(query: str, document: Document) -> float:
     title_text = document.title.lower()
     content_text = document.content.lower()
     tag_text = " ".join(document.tags).lower()
+    source_text = document.source.lower()
+
 
     score = 0.0
 
@@ -28,6 +30,8 @@ def score_document(query: str, document: Document) -> float:
             score += 2.0
         if token in content_text:
             score += 1.0
+        if token in source_text:
+            score += 3.0
 
     file_name = Path(document.source).name.lower()
     if file_name == "notebook-summary.md":

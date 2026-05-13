@@ -45,3 +45,27 @@ def build_user_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) -> 
         "sources": ["列出你实际使用的资料来源路径"]
     }}
     """
+
+def build_summary_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) -> str:
+    content_block = build_context_block(retrieved_chunks)
+
+    return f"""用户希望你总结课程内容。
+
+    用户请求：
+    {question}
+
+    相关课程资料：
+    {content_block}
+
+    请基于以上资料输出 JSON：
+    {{
+        "answer": "用清晰的方式总结这节课 / 这个notebook的核心内容",
+        "suggestions": ["给出1-3条后续学习建议"],
+        "sources": ["列出你实际使用的资料来源路径"]
+    }}
+
+    总结时尽量包括：
+    1.这一节主要在讲什么
+    2.他解决了什么问题
+    3.它的关键收获是什么
+    """

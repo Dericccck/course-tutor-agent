@@ -8,7 +8,7 @@ from openai import OpenAI
 from pydantic import ValidationError
 
 from config import Settings, get_settings, validate_settings
-from prompts import SYSTEM_PROMPT, build_user_prompt
+from prompts import SYSTEM_PROMPT, build_user_prompt, build_summary_prompt
 from retriever import retrieve_documents
 from schemas import AgentAnswer, Document
 
@@ -34,7 +34,11 @@ def ask_course_agent(question: str, documents: list[Document], settings: Setting
         )
     
     client = build_client(active_settings)
-    user_prompt = build_user_prompt(question, retrieved_chunks)
+    task_type = detect_task_type(question)
+    if task_type == "summary":
+        user_prompt = build_summary_prompt(question, retrieved_chunks)
+    else:
+        user_prompt = build_user_prompt(question, retrieved_chunks)
 
     response = client.chat.completions.create(
         model=active_settings.model_name,
@@ -61,3 +65,24 @@ def ask_course_agent(question: str, documents: list[Document], settings: Setting
         answer.sources = [chunk.source for chunk in retrieved_chunks]
 
     return answer
+
+
+def detect_task_type(question: str) -> str:
+    lowered = question.lower()
+
+    summary_keywords = [
+        "总结",
+        "概述",
+        "概要",
+        "讲什么",
+        "这一节",
+        "这节课",
+        "notebook",
+        "lesson",
+    ]
+
+    for keyword in summary_keywords:
+        if keyword in lowered:
+            return "summary"
+
+    return "qa"
