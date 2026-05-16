@@ -9,6 +9,19 @@ class Document(BaseModel):
     content: str = Field(..., description="Full extracted text content") # 全文摘录
     doc_type: str = Field(..., description="Document type, e.g. md or ipynb") # 文档类型，例如md或ipynb
     tags: list[str] = Field(default_factory=list, description="Optional topic tags") # 可选主题标签 default_factory=list 表示“如果用户没传值，就默认创建一个新的空列表”
+    # --- 构建前置数据清洗器 ---
+    # @field_validator: Pydantic v2 的核心校验装饰器，指定对 "tags" 字段进行校验
+    # mode="before": 关键参数！表示该逻辑在 Pydantic 进行标准类型检查和转换【之前】触发
+    @field_validator("tags", mode="before")
+    # Pydantic 的验证器方法通常需要声明为类方法
+    @classmethod
+    def normalize_tags(cls, value):
+        """
+        前置清洗函数：接收外界传入的原始脏数据（value），在它被强转为 list[str] 之前进行拦截。
+        """
+        if value is None:
+            return []
+        return value
 
 # 一次检索命中的结果
 class RetrievedChunk(BaseModel):
