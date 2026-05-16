@@ -18,6 +18,11 @@ def print_help() -> None:
     print("- set_goal: 你的学习目标")
     print("- set_scope: 你的学习范围")
     print("- exit / quit / q：退出程序")
+    print("- mark_done: 标记某个主题为已完成")
+    print("- show_memory：查看当前学习记忆")
+    print("- clear_goal：清除当前学习目标")
+    print("- clear_scope：清除当前学习范围")
+    print("- unmark_done: 主题名：取消某个已完成主题")
     print()
 
 
@@ -76,6 +81,64 @@ if __name__ == "__main__":
             save_user_memory(memory)
 
             print(f"学习范围已保存：{scope}\n")
+            continue
+
+        if question.startswith("mark_done:"):
+            topic = question.removeprefix("mark_done:").strip()
+
+            if not topic:
+                print("已完成主题不能为空。\n")
+
+            completed_topics = memory.setdefault("completed_topics", [])
+
+            if topic in completed_topics:
+                print(f"该主题已存在：{topic}\n")
+            else:
+                completed_topics.append(topic)
+                save_user_memory(memory)
+                print(f"已完成主题已保存：{topic}\n")
+            continue
+
+        if question == "show_memory":
+            print("\n当前学习记忆：")
+            print(f"- 学习目标: {memory.get('learning_goal', '') or '未设置'}")
+            print(f"- 学习范围: {memory.get('preferred_scope', '') or '未设置'}")
+
+            completed_topics = memory.get("completed_topics", [])
+            if completed_topics:
+                print("- 已完成主题:")
+                for topic in completed_topics:
+                    print(f"  - {topic}")
+            else:
+                print("- 已完成主题: 无")
+
+            print()
+            continue
+
+        if question == "clear_goal":
+            memory["learning_goal"] = ""
+            save_user_memory(memory)
+            print("学习目标已清除。\n")
+            continue
+
+        if question == "clear_scope":
+            memory["preferred_scope"] = ""
+            save_user_memory(memory)
+            print("学习范围已清除。\n")
+            continue
+
+        if question.startswith("unmark_done:"):
+            topic = question.removeprefix("unmark_done:").strip()
+            if not topic:
+                print("要取消的主题不能为空。\n")
+                continue
+            completed_topics = memory.get("completed_topics", [])
+            if topic not in completed_topics:
+                print(f"未找到该已完成主题：{topic}\n")
+            else:
+                completed_topics.remove(topic)
+                save_user_memory(memory)
+                print(f"已取消完成主题：{topic}\n")
             continue
 
         if not question:
