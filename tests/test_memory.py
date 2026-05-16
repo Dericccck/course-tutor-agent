@@ -1,11 +1,23 @@
 # 测试本地用户记忆的读写逻辑：
-# 1. 首次读取时返回默认结构
-# 2. 保存后能够正确读回
-# 3. completed_topics 列表能被正确保留
+# 1. 默认结构函数返回统一 memory 结构
+# 2. 首次读取时返回默认结构
+# 3. 保存后能够正确读回
+# 4. completed_topics 列表能被正确保留
 
 from pathlib import Path
 
 import memory
+
+
+def test_build_default_memory_returns_expected_structure():
+    # 默认 memory 结构应统一由 build_default_memory 提供
+    result = memory.build_default_memory()
+
+    assert result == {
+        "learning_goal": "",
+        "preferred_scope": "",
+        "completed_topics": [],
+    }
 
 
 def test_load_user_memory_returns_default_when_file_missing(monkeypatch, tmp_path: Path):
@@ -15,11 +27,7 @@ def test_load_user_memory_returns_default_when_file_missing(monkeypatch, tmp_pat
 
     result = memory.load_user_memory()
 
-    assert result == {
-        "learning_goal": "",
-        "preferred_scope": "",
-        "completed_topics": [],
-    }
+    assert result == memory.build_default_memory()
 
 
 def test_save_and_load_user_memory_round_trip(monkeypatch, tmp_path: Path):

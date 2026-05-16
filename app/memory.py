@@ -6,11 +6,7 @@ MEMORY_FILE = Path(__file__).resolve().parents[1] / "data" / "user_memory.json"
 
 def load_user_memory() -> dict:
     if not MEMORY_FILE.exists():
-        return {
-            "learning_goal": "",
-            "preferred_scope": "",
-            "completed_topics": [],
-        }
+        return build_default_memory()
     
     with MEMORY_FILE.open("r", encoding="utf-8") as f:
         return json.load(f)
@@ -26,3 +22,10 @@ def save_user_memory(memory: dict) -> None:
         # - ensure_ascii=False：允许直接写入中文等非 ASCII 字符，避免变成 \u4e00 这种乱码
         # - indent=2：设置缩进为 2 个空格，让生成的 JSON 文件美观可读，也极其方便 Git 进行版本内容对比
         json.dump(memory, f, ensure_ascii=False, indent=2)
+
+def build_default_memory() -> dict:
+    return {
+        "learning_goal": "",
+        "preferred_scope": "",
+        "completed_topics": [],
+    }

@@ -3,7 +3,7 @@
 from agent import ask_course_agent
 from config import get_settings
 from loader import load_documents
-from memory import load_user_memory, save_user_memory
+from memory import load_user_memory, save_user_memory, build_default_memory
 
 
 def print_help() -> None:
@@ -154,11 +154,7 @@ if __name__ == "__main__":
             continue
 
         if question == "reset_memory":
-            memory = {
-                "learning_goal": "",
-                "preferred_scope": "",
-                "completed_topics": [],
-            }
+            memory = build_default_memory()
             save_user_memory(memory)
             print("学习记忆已重置。\n")
             continue
