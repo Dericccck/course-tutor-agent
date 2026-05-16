@@ -60,6 +60,11 @@ def score_document(query: str, document: Document) -> float:
         if "agent" in title_text:
             score += 1.5
     
+    query_phrases = extract_query_phrases(query)
+    for phrase in query_phrases:
+        if phrase and phrase in title_text:
+            score += 6.0
+    
     return score
 
 # 从文档里截一小段命中内容，后面给模型时会更有用，也便于调试。
@@ -131,4 +136,14 @@ def is_agent_project_query(query: str) -> bool:
     ]
 
     return any(keyword in lowered for keyword in keywords)
+
+def extract_query_phrases(query: str) -> list[str]:
+    lowered = query.lower().strip()
+
+    phrases: list[str] = []
+
+    if len(lowered) >= 2:
+        phrases.append(lowered)
+
+    return phrases
             

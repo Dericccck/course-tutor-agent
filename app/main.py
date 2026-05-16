@@ -23,6 +23,7 @@ def print_help() -> None:
     print("- clear_goal：清除当前学习目标")
     print("- clear_scope：清除当前学习范围")
     print("- unmark_done: 主题名：取消某个已完成主题")
+    print("- show_examples：查看示例问题")
     print()
 
 
@@ -139,6 +140,11 @@ if __name__ == "__main__":
                 completed_topics.remove(topic)
                 save_user_memory(memory)
                 print(f"已取消完成主题：{topic}\n")
+            continue
+
+        if question == "show_examples":
+            print()
+            print_example_questions()
             continue
 
         if not question:
