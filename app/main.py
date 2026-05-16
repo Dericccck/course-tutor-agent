@@ -24,6 +24,33 @@ def print_help() -> None:
     print("- clear_scope：清除当前学习范围")
     print("- unmark_done: 主题名：取消某个已完成主题")
     print("- show_examples：查看示例问题")
+    print("- show_progress：查看当前学习进度摘要")
+    print("- clear_done：清空所有已完成主题")
+    print("- reset_memory：重置全部学习记忆")
+    print()
+
+def print_progress(memory: dict) -> None:
+    goal = memory.get("learning_goal", "").strip()
+    scope = memory.get("preferred_scope", "").strip()
+    completed_topics = memory.get("completed_topics", [])
+
+    print("\n当前学习进度摘要：")
+    print(f"- 学习目标: {goal or '未设置'}")
+    print(f"- 学习范围: {scope or '未设置'}")
+    print(f"- 已完成主题数量: {len(completed_topics)}")
+
+    if completed_topics:
+        print("- 已完成主题列表:")
+        for topic in completed_topics:
+            print(f"  - {topic}")
+    else:
+        print("- 已完成主题列表: 无")
+
+    if completed_topics:
+        print("- 当前建议: 优先继续学习尚未完成的后续模块。")
+    else:
+        print("- 当前建议: 可以先从基础模块开始建立整体框架。")
+
     print()
 
 
@@ -114,6 +141,26 @@ if __name__ == "__main__":
                 print("- 已完成主题: 无")
 
             print()
+            continue
+
+        if question == "show_progress":
+            print_progress(memory)
+            continue
+
+        if question == "clear_done":
+            memory["completed_topics"] = []
+            save_user_memory(memory)
+            print("已完成主题已清空。\n")
+            continue
+
+        if question == "reset_memory":
+            memory = {
+                "learning_goal": "",
+                "preferred_scope": "",
+                "completed_topics": [],
+            }
+            save_user_memory(memory)
+            print("学习记忆已重置。\n")
             continue
 
         if question == "clear_goal":

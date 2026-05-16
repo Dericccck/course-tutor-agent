@@ -1,6 +1,7 @@
 # 测试 main.py 中当前可独立验证的 CLI 辅助输出：
 # 1. 帮助文本应包含当前支持的核心命令
 # 2. 示例问题应覆盖问答 / 总结 / 学习顺序建议三类能力
+# 3. 学习进度摘要应正确展示空状态和有进度状态
 
 import main
 
@@ -17,8 +18,11 @@ def test_print_help_contains_core_commands(capsys):
     assert "set_scope:" in output
     assert "mark_done:" in output
     assert "show_memory" in output
+    assert "show_progress" in output
     assert "clear_goal" in output
     assert "clear_scope" in output
+    assert "clear_done" in output
+    assert "reset_memory" in output
     assert "unmark_done:" in output
     assert "exit / quit / q" in output
 
@@ -32,3 +36,46 @@ def test_print_example_questions_covers_three_core_scenarios(capsys):
     assert "tool use 是什么，和 agent 有什么关系？" in output
     assert "帮我总结 07-planning-design 这一节在讲什么" in output
     assert "如果我只学 1-* 和 2-*，想做一个 AIAgent 项目，请按课程模块给我安排学习顺序。" in output
+
+
+def test_print_progress_shows_empty_state(capsys):
+    # 当记忆为空时，学习进度摘要应显示未设置和空列表
+    memory = {
+        "learning_goal": "",
+        "preferred_scope": "",
+        "completed_topics": [],
+    }
+
+    main.print_progress(memory)
+    captured = capsys.readouterr()
+    output = captured.out
+
+    assert "当前学习进度摘要" in output
+    assert "学习目标: 未设置" in output
+    assert "学习范围: 未设置" in output
+    assert "已完成主题数量: 0" in output
+    assert "已完成主题列表: 无" in output
+    assert "可以先从基础模块开始建立整体框架" in output
+
+
+def test_print_progress_shows_completed_topics(capsys):
+    # 当记忆中已有目标、范围和已完成主题时，应正确展示摘要信息
+    memory = {
+        "learning_goal": "我想做一个 AIAgent 项目",
+        "preferred_scope": "我只学习 1-* 和 2-* 的内容",
+        "completed_topics": [
+            "01 Intro To AI Agents 学习摘要",
+            "02 Explore Agentic Frameworks 学习摘要",
+        ],
+    }
+
+    main.print_progress(memory)
+    captured = capsys.readouterr()
+    output = captured.out
+
+    assert "学习目标: 我想做一个 AIAgent 项目" in output
+    assert "学习范围: 我只学习 1-* 和 2-* 的内容" in output
+    assert "已完成主题数量: 2" in output
+    assert "01 Intro To AI Agents 学习摘要" in output
+    assert "02 Explore Agentic Frameworks 学习摘要" in output
+    assert "优先继续学习尚未完成的后续模块" in output
