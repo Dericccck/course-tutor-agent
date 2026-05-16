@@ -113,6 +113,12 @@
   - 无检索结果时的兜底回答
   - summary 任务自动更新 completed_topics
   - 模型返回非法 JSON 时的 fallback 处理
+- 覆盖学习进度与学习路线联动：
+  - 已完成模块与未完成模块划分
+  - 学习目标 / 学习范围 / 已完成主题共同进入学习路线 prompt
+- 覆盖 CLI 辅助输出：
+  - help 文本包含关键命令
+  - 示例问题覆盖问答 / 总结 / 学习顺序建议三类场景
 
 ## 当前版本未完成的部分
 
@@ -140,9 +146,11 @@ course-tutor-agent/
     conftest.py
     test_agent.py
     test_loader.py
+    test_main_helpers.py
     test_memory.py
     test_prompts.py
     test_retriever.py
+    test_study_plan_memory.py
     test_task_routing.py
 ```
 
