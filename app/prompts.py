@@ -73,10 +73,18 @@ def build_summary_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) 
 def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) -> str:
     context_block = build_context_block(retrieved_chunks)
 
+    allowed_titles = "\n".join(
+        f"- {chunk.title}"
+        for chunk in retrieved_chunks
+    )
+
     return f"""用户希望你根据课程资料给出学习顺序建议。
 
     用户请求：
     {question}
+
+    本次允许引用的课程模块标题：
+    {allowed_titles}
 
     相关课程资料：
     {context_block}
@@ -89,14 +97,23 @@ def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk
     }}
 
     回答时请尽量按这个结构组织：
-    1. 先学什么
-    2. 再学什么
-    3. 最后学什么
-    4. 每一步为什么这样安排
+    1. 第一阶段：先学什么
+    2. 第二阶段：再学什么
+    3. 第三阶段：最后学什么
+    4. 每个阶段为什么这样安排
     5. 如果目标是做一个 AIAgent 项目，需要优先掌握哪些能力
 
     要求：
     - 优先结合课程目录之间的依赖关系安排顺序
+    - 尽量引用具体课程模块或章节，而不是只写笼统的大目录
+    - 如果用户目标是做一个 AIAgent 项目，学习路线应尽量同时覆盖：
+    1. 基础能力
+    2. RAG / 检索增强能力
+    3. Agent 设计与工具调用能力
+    - 只允许使用“本次允许引用的课程模块标题”中的真实标题名称
+    - 不要把标题改写成你自己猜测的编号或缩写
+    - 不要编造不存在的课程名、编号或目录结构
+    - 如果无法确定具体编号，就直接使用上面的真实标题
     - 回答要像学习路线图，而不是泛泛推荐
     - 如果资料不足，不要编造不存在的课程内容
     """

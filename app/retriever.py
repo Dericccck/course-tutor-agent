@@ -36,6 +36,29 @@ def score_document(query: str, document: Document) -> float:
     file_name = Path(document.source).name.lower()
     if file_name == "notebook-summary.md":
         score += 2.0
+
+    if is_study_plan_query(query):
+        if "notebook-summary.md" in source_text:
+            score += 1.5
+
+        if "lesson" in title_text or "intro" in title_text:
+            score += 1.5
+
+        if "/1-" in source_text or "/2-" in source_text:
+            score += 1.5
+
+        if "这一节在做什么" in content_text or "关键收获" in content_text:
+            score += 1.0
+
+    if is_agent_project_query(query):
+        if "ai-agents-for-beginners" in source_text:
+            score += 2.0
+
+        if "agent" in tag_text:
+            score += 1.5
+
+        if "agent" in title_text:
+            score += 1.5
     
     return score
 
@@ -79,4 +102,33 @@ def retrieve_documents(query: str, documents: list[Document], top_k: int = 5,) -
 
     scored_results.sort(key=lambda item: item.score, reverse=True)
     return scored_results[:top_k]
+
+def is_study_plan_query(query: str) -> bool:
+    lowered = query.lower()
+
+    keywords = [
+        "学习顺序",
+        "学习路线",
+        "学习计划",
+        "怎么学",
+        "从哪里开始",
+        "先学什么",
+        "roadmap",
+        "plan",
+    ]
+
+    return any(keyword in lowered for keyword in keywords)
+
+def is_agent_project_query(query: str) -> bool:
+    lowered = query.lower()
+
+    keywords = [
+        "agent",
+        "aiagent",
+        "aiaagent",
+        "智能体",
+        "项目",
+    ]
+
+    return any(keyword in lowered for keyword in keywords)
             
