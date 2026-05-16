@@ -101,6 +101,14 @@
   - Tool Use 问答命中
   - 章节总结命中
   - 学习路线问题命中 Agent 相关资料
+- 覆盖本地用户记忆读写：
+  - 默认结构返回
+  - 保存与读取一致性
+  - 自动创建 memory 文件目录
+- 覆盖 prompt 组织逻辑：
+  - memory 展开
+  - 普通问答 prompt 拼接
+  - 学习路线 prompt 中已完成 / 未完成模块划分
 
 ## 当前版本未完成的部分
 
@@ -127,6 +135,8 @@ course-tutor-agent/
   tests/
     conftest.py
     test_loader.py
+    test_memory.py
+    test_prompts.py
     test_retriever.py
     test_task_routing.py
 ```
