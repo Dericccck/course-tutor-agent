@@ -105,6 +105,12 @@ def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk
     context_block = build_context_block(retrieved_chunks)
     memory_block = build_memory_block(memory or {})
 
+    completed_topics = memory.get("completed_topics", []) if memory else []
+    remaining_titles = [chunk.title for chunk in retrieved_chunks if chunk.title not in completed_topics]
+    completed_titles_in_context = [chunk.title for chunk in retrieved_chunks if chunk.title in completed_topics]
+    remaining_titles_block = "\n".join(f"- {title}" for title in remaining_titles or "- 无")
+    completed_titles_block = "\n".join(f"- {title}" for title in completed_titles_in_context or "- 无")
+
     allowed_titles = "\n".join(
         f"- {chunk.title}"
         for chunk in retrieved_chunks
@@ -117,6 +123,12 @@ def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk
 
     用户当前记忆：
     {memory_block}
+
+    本次可优先推荐的未完成模块：
+    {remaining_titles_block}
+
+    本次上下文中已完成的模块：
+    {completed_titles_block}
 
     本次允许引用的课程模块标题：
     {allowed_titles}
@@ -154,4 +166,6 @@ def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk
     - 对于“用户已完成的主题”，不要再把它们作为优先学习阶段重复推荐
     - 可以在路线中简短提到它们已完成，但后续建议应优先指向尚未完成的模块
     - 如果用户已经完成某个模块，应尽量推荐它的后续模块，而不是重复推荐同一模块
+    - 如果“本次可优先推荐的未完成模块”不为空，优先从这些模块中安排后续学习路线
+    - 不要把“本次上下文中已完成的模块”排成第一阶段或优先阶段，除非用户明确要求复习
     """
