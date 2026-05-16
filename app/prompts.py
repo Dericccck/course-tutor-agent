@@ -12,6 +12,29 @@ SYSTEM_PROMPT = """你是一个课程辅导 Agent，负责基于本地课程资�
 5.输出必须是JSON，且包含answer、suggestions、sources三个字段。
 """
 
+def build_memory_block(memory: dict) -> str:
+    goal = memory.get("learning_goal", "").strip()
+    scope = memory.get("preferred_scope", "").strip()
+    completed_topics = memory.get("completed_topics", [])
+
+    lines: list[str] = []
+
+    if goal:
+        lines.append(f"学习目标：{goal}")
+
+    if scope:
+        lines.append(f"学习范围：{scope}")
+
+    if completed_topics:
+        lines.append("已完成主题：")
+        for topic in completed_topics:
+            lines.append(f"- {topic}")
+
+    if not lines:
+        return "无"
+
+    return "\n".join(lines)
+
 # 因为检索结果本身是结构化的，但模型输入需要是文本。  结构化检索结果 -> 模型可读上下文
 def build_context_block(retrieved_chunks: list[RetrievedChunk]) -> str:
     sections: list[str] = []
@@ -29,11 +52,15 @@ def build_context_block(retrieved_chunks: list[RetrievedChunk]) -> str:
     return "\n".join(sections)
 
 # 只负责组织这一轮输入，不负责模型调用
-def build_user_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) -> str:
+def build_user_prompt(question: str, retrieved_chunks: list[RetrievedChunk], memory: dict | None = None,) -> str:
     context_block = build_context_block(retrieved_chunks)
+    memory_block = build_memory_block(memory or {})
 
     return f"""用户问题：
     {question}
+
+    用户当前记忆：
+    {memory_block}
     
     相关课程资料：
     {context_block}
@@ -46,13 +73,17 @@ def build_user_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) -> 
     }}
     """
 
-def build_summary_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) -> str:
+def build_summary_prompt(question: str, retrieved_chunks: list[RetrievedChunk], memory: dict | None = None) -> str:
     content_block = build_context_block(retrieved_chunks)
+    memory_block = build_memory_block(memory or {})
 
     return f"""用户希望你总结课程内容。
 
     用户请求：
     {question}
+
+    用户当前记忆：
+    {memory_block}
 
     相关课程资料：
     {content_block}
@@ -70,8 +101,9 @@ def build_summary_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) 
     3.它的关键收获是什么
     """
 
-def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) -> str:
+def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk], memory: dict | None = None,) -> str:
     context_block = build_context_block(retrieved_chunks)
+    memory_block = build_memory_block(memory or {})
 
     allowed_titles = "\n".join(
         f"- {chunk.title}"
@@ -82,6 +114,9 @@ def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk
 
     用户请求：
     {question}
+
+    用户当前记忆：
+    {memory_block}
 
     本次允许引用的课程模块标题：
     {allowed_titles}

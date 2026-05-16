@@ -25,7 +25,7 @@ def build_client(settings: Settings) -> OpenAI:
 
     return OpenAI(**client_kwargs)
 
-def ask_course_agent(question: str, documents: list[Document], settings: Settings | None = None) -> AgentAnswer:
+def ask_course_agent(question: str, documents: list[Document], settings: Settings | None = None, memory: dict | None = None,) -> AgentAnswer:
     active_settings = settings or get_settings()
     validate_settings(active_settings)
 
@@ -41,11 +41,19 @@ def ask_course_agent(question: str, documents: list[Document], settings: Setting
     client = build_client(active_settings)
     task_type = detect_task_type(question)
     if task_type == "summary":
-        user_prompt = build_summary_prompt(question, retrieved_chunks)
+        user_prompt = build_summary_prompt(question, retrieved_chunks, memory=memory)
     elif task_type == "study_plan":
-        user_prompt = build_study_plan_prompt(question, retrieved_chunks)
+        user_prompt = build_study_plan_prompt(question, retrieved_chunks, memory=memory)
     else:
-        user_prompt = build_user_prompt(question, retrieved_chunks)
+        user_prompt = build_user_prompt(question, retrieved_chunks, memory=memory)
+
+    if task_type == "summary" and memory is not None and retrieved_chunks:
+        # 第一条通常就是最相关、最可能是这次总结目标的章节 
+        # 为什么这里不直接 save_user_memory(...)
+            #因为现在更好的职责分层是：
+            #agent.py 负责修改内存中的 memory
+            #main.py 负责在合适的时候保存到文件
+        update_completed_topic(memory, retrieved_chunks[0].title)
 
     response = client.chat.completions.create(
         model=active_settings.model_name,
@@ -108,3 +116,11 @@ def detect_task_type(question: str) -> str:
             return "study_plan"
 
     return "qa"
+
+
+def update_completed_topic(memory: dict, topic_title: str) -> None:
+    # 如果 memory 里已经有 completed_topics，就拿出来, 如果没有，就先创建一个空列表
+    completed_topic = memory.setdefault("completed_topics", [])
+
+    if topic_title not in completed_topic:
+        completed_topic.append(topic_title)
