@@ -69,3 +69,34 @@ def build_summary_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) 
     2.他解决了什么问题
     3.它的关键收获是什么
     """
+
+def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk]) -> str:
+    context_block = build_context_block(retrieved_chunks)
+
+    return f"""用户希望你根据课程资料给出学习顺序建议。
+
+    用户请求：
+    {question}
+
+    相关课程资料：
+    {context_block}
+
+    请基于以上资料输出 JSON：
+    {{
+    "answer": "给出学习顺序建议，并解释为什么这样安排",
+    "suggestions": ["给出 1-3 条后续学习建议"],
+    "sources": ["列出你实际使用的资料来源路径"]
+    }}
+
+    回答时请尽量按这个结构组织：
+    1. 先学什么
+    2. 再学什么
+    3. 最后学什么
+    4. 每一步为什么这样安排
+    5. 如果目标是做一个 AIAgent 项目，需要优先掌握哪些能力
+
+    要求：
+    - 优先结合课程目录之间的依赖关系安排顺序
+    - 回答要像学习路线图，而不是泛泛推荐
+    - 如果资料不足，不要编造不存在的课程内容
+    """

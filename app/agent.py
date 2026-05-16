@@ -8,7 +8,12 @@ from openai import OpenAI
 from pydantic import ValidationError
 
 from config import Settings, get_settings, validate_settings
-from prompts import SYSTEM_PROMPT, build_user_prompt, build_summary_prompt
+from prompts import (
+    SYSTEM_PROMPT,
+    build_user_prompt,
+    build_summary_prompt,
+    build_study_plan_prompt,
+)
 from retriever import retrieve_documents
 from schemas import AgentAnswer, Document
 
@@ -37,6 +42,8 @@ def ask_course_agent(question: str, documents: list[Document], settings: Setting
     task_type = detect_task_type(question)
     if task_type == "summary":
         user_prompt = build_summary_prompt(question, retrieved_chunks)
+    elif task_type == "study_plan":
+        user_prompt = build_study_plan_prompt(question, retrieved_chunks)
     else:
         user_prompt = build_user_prompt(question, retrieved_chunks)
 
@@ -81,8 +88,23 @@ def detect_task_type(question: str) -> str:
         "lesson",
     ]
 
+    study_plan_keywords = [
+        "学习顺序",
+        "学习路线",
+        "学习计划",
+        "怎么学",
+        "从哪里开始",
+        "先学什么",
+        "roadmap",
+        "plan",
+    ]
+
     for keyword in summary_keywords:
         if keyword in lowered:
             return "summary"
+    
+    for keyword in study_plan_keywords:
+        if keyword in lowered:
+            return "study_plan"
 
     return "qa"
