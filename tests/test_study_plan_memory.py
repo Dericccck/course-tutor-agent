@@ -118,3 +118,33 @@ def test_study_plan_prompt_requires_explaining_next_step_based_on_completed_topi
 
     assert "基于已完成内容，下一步建议是什么" in prompt
     assert "你已经完成了 A，因此建议继续学习 B、C" in prompt
+
+
+def test_study_plan_prompt_requires_respecting_preferred_scope():
+    # 当用户设置了学习范围时，学习路线 prompt 应强调优先在该范围内推荐
+    memory = {
+        "learning_goal": "我想继续做一个 AIAgent 项目",
+        "preferred_scope": "我只学习 1-* 和 2-* 的内容",
+        "completed_topics": [],
+    }
+
+    chunks = [
+        make_chunk(
+            "01 Intro To AI Agents 学习摘要",
+            "/tmp/01-intro-to-ai-agents/notebook-summary.md",
+        ),
+        make_chunk(
+            "05 Agentic RAG 学习摘要",
+            "/tmp/05-agentic-rag/notebook-summary.md",
+        ),
+    ]
+
+    prompt = build_study_plan_prompt(
+        "如果我想继续做一个 AIAgent 项目，接下来应该按课程模块怎么学？",
+        chunks,
+        memory=memory,
+    )
+
+    assert "如果用户设置了学习范围，应优先在该范围内安排学习路线" in prompt
+    assert "如果某些推荐内容超出用户当前学习范围" in prompt
+    assert "我只学习 1-* 和 2-* 的内容" in prompt
