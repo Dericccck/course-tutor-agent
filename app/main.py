@@ -50,6 +50,12 @@ def print_progress(memory: dict) -> None:
         print("- 当前建议: 优先继续学习尚未完成的后续模块。")
     else:
         print("- 当前建议: 可以先从基础模块开始建立整体框架。")
+    
+    next_topic = get_next_recommended_topic(memory)
+    if next_topic:
+        print(f"- 当前建议下一步: {next_topic}")
+    else:
+        print("- 当前建议下一步: 当前主学习路线已全部完成，可以开始复习或扩展新主题。")
 
     print()
 
@@ -60,6 +66,24 @@ def print_example_questions() -> None:
     print("- 帮我总结 07-planning-design 这一节在讲什么")
     print("- 如果我只学 1-* 和 2-*，想做一个 AIAgent 项目，请按课程模块给我安排学习顺序。")
     print()
+
+LEARNING_SEQUENCE = [
+    "01 Intro To AI Agents 学习摘要",
+    "02 Explore Agentic Frameworks 学习摘要",
+    "03 Agentic Design Patterns 学习摘要",
+    "05 Agentic RAG 学习摘要",
+    "06 Building Trustworthy Agents 学习摘要",
+    "11 Agentic Protocols 学习摘要",
+]
+
+def get_next_recommended_topic(memory: dict) -> str | None:
+    completed_topics = memory.get("completed_topics", [])
+
+    for topic in LEARNING_SEQUENCE:
+        if topic not in completed_topics:
+            return topic
+
+    return None
 
 
 if __name__ == "__main__":

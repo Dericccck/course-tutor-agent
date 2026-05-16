@@ -2,6 +2,7 @@
 # 1. 帮助文本应包含当前支持的核心命令
 # 2. 示例问题应覆盖问答 / 总结 / 学习顺序建议三类能力
 # 3. 学习进度摘要应正确展示空状态和有进度状态
+# 4. 学习进度摘要应给出下一步推荐主题
 
 import main
 
@@ -56,6 +57,7 @@ def test_print_progress_shows_empty_state(capsys):
     assert "已完成主题数量: 0" in output
     assert "已完成主题列表: 无" in output
     assert "可以先从基础模块开始建立整体框架" in output
+    assert "当前建议下一步: 01 Intro To AI Agents 学习摘要" in output
 
 
 def test_print_progress_shows_completed_topics(capsys):
@@ -79,3 +81,33 @@ def test_print_progress_shows_completed_topics(capsys):
     assert "01 Intro To AI Agents 学习摘要" in output
     assert "02 Explore Agentic Frameworks 学习摘要" in output
     assert "优先继续学习尚未完成的后续模块" in output
+    assert "当前建议下一步: 03 Agentic Design Patterns 学习摘要" in output
+
+
+def test_get_next_recommended_topic_returns_first_unfinished():
+    # 当只完成了前两个主题时，下一步应推荐第三个主题
+    memory = {
+        "learning_goal": "",
+        "preferred_scope": "",
+        "completed_topics": [
+            "01 Intro To AI Agents 学习摘要",
+            "02 Explore Agentic Frameworks 学习摘要",
+        ],
+    }
+
+    result = main.get_next_recommended_topic(memory)
+
+    assert result == "03 Agentic Design Patterns 学习摘要"
+
+
+def test_get_next_recommended_topic_returns_none_when_all_finished():
+    # 当主学习路线全部完成时，不应再返回新的推荐主题
+    memory = {
+        "learning_goal": "",
+        "preferred_scope": "",
+        "completed_topics": list(main.LEARNING_SEQUENCE),
+    }
+
+    result = main.get_next_recommended_topic(memory)
+
+    assert result is None
