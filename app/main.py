@@ -38,6 +38,7 @@ def print_progress(memory: dict) -> None:
     print(f"- 学习目标: {goal or '未设置'}")
     print(f"- 学习范围: {scope or '未设置'}")
     print(f"- 已完成主题数量: {len(completed_topics)}")
+    print(f"- 当前学习阶段: {get_learning_stage(memory)}")
 
     if completed_topics:
         print("- 已完成主题列表:")
@@ -84,6 +85,26 @@ def get_next_recommended_topic(memory: dict) -> str | None:
             return topic
 
     return None
+
+def get_learning_stage(memory: dict) -> str:
+    completed_topics = memory.get("completed_topics", [])
+
+    if not completed_topics:
+        return "基础起步阶段"
+
+    if "01 Intro To AI Agents 学习摘要" in completed_topics and \
+       "02 Explore Agentic Frameworks 学习摘要" not in completed_topics:
+        return "基础理解阶段"
+
+    if "02 Explore Agentic Frameworks 学习摘要" in completed_topics and \
+       "03 Agentic Design Patterns 学习摘要" not in completed_topics:
+        return "框架理解阶段"
+
+    if "03 Agentic Design Patterns 学习摘要" in completed_topics and \
+       "05 Agentic RAG 学习摘要" not in completed_topics:
+        return "设计与增强阶段"
+
+    return "深化与扩展阶段"
 
 
 if __name__ == "__main__":
