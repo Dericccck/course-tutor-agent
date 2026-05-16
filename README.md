@@ -109,6 +109,10 @@
   - memory 展开
   - 普通问答 prompt 拼接
   - 学习路线 prompt 中已完成 / 未完成模块划分
+- 覆盖 agent 主流程本地行为：
+  - 无检索结果时的兜底回答
+  - summary 任务自动更新 completed_topics
+  - 模型返回非法 JSON 时的 fallback 处理
 
 ## 当前版本未完成的部分
 
@@ -134,6 +138,7 @@ course-tutor-agent/
     user_memory.json
   tests/
     conftest.py
+    test_agent.py
     test_loader.py
     test_memory.py
     test_prompts.py
