@@ -26,7 +26,7 @@ def build_memory_block(memory: dict) -> str:
         lines.append(f"学习范围：{scope}")
 
     if completed_topics:
-        lines.append("已完成主题：")
+        lines.append("用户已完成的主题：")
         for topic in completed_topics:
             lines.append(f"- {topic}")
 
@@ -151,4 +151,7 @@ def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk
     - 如果无法确定具体编号，就直接使用上面的真实标题
     - 回答要像学习路线图，而不是泛泛推荐
     - 如果资料不足，不要编造不存在的课程内容
+    - 对于“用户已完成的主题”，不要再把它们作为优先学习阶段重复推荐
+    - 可以在路线中简短提到它们已完成，但后续建议应优先指向尚未完成的模块
+    - 如果用户已经完成某个模块，应尽量推荐它的后续模块，而不是重复推荐同一模块
     """
