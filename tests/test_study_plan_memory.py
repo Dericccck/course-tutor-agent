@@ -87,3 +87,34 @@ def test_study_plan_prompt_keeps_goal_scope_and_progress_together():
     assert "我只学习 1-* 和 2-* 的内容" in prompt
     assert "01 Intro To AI Agents 学习摘要" in prompt
 
+
+def test_study_plan_prompt_requires_explaining_next_step_based_on_completed_topics():
+    # 当存在已完成主题时，prompt 应明确要求模型说明“基于已完成内容，下一步建议是什么”
+    memory = {
+        "learning_goal": "我想继续做一个 AIAgent 项目",
+        "preferred_scope": "我只学习 1-* 和 2-* 的内容",
+        "completed_topics": [
+            "01 Intro To AI Agents 学习摘要",
+            "02 Explore Agentic Frameworks 学习摘要",
+        ],
+    }
+
+    chunks = [
+        make_chunk(
+            "03 Agentic Design Patterns 学习摘要",
+            "/tmp/03-agentic-design-patterns/notebook-summary.md",
+        ),
+        make_chunk(
+            "05 Agentic RAG 学习摘要",
+            "/tmp/05-agentic-rag/notebook-summary.md",
+        ),
+    ]
+
+    prompt = build_study_plan_prompt(
+        "如果我想继续做一个 AIAgent 项目，接下来应该按课程模块怎么学？",
+        chunks,
+        memory=memory,
+    )
+
+    assert "基于已完成内容，下一步建议是什么" in prompt
+    assert "你已经完成了 A，因此建议继续学习 B、C" in prompt
