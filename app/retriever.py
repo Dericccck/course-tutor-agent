@@ -99,6 +99,7 @@ def retrieve_documents(query: str, documents: list[Document], top_k: int = 5,) -
             RetrievedChunk(
                 source=document.source,
                 title=document.title,
+                chunk_id=None,
                 snippet=build_snippet(document, query),
                 score=score,
                 tags=document.tags,
@@ -191,6 +192,7 @@ def retrieve_chunks(query: str, chunks: list[DocumentChunk], top_k: int = 5) -> 
             RetrievedChunk(
                 source=chunk.source,
                 title=chunk.title,
+                chunk_id=chunk.chunk_id,
                 snippet=build_chunk_snippet(chunk, query),
                 score=score,
                 tags=chunk.tags,

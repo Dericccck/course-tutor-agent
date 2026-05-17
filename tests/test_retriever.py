@@ -42,3 +42,14 @@ def test_retrieve_study_plan_question():
     sources = [item.source for item in results]
 
     assert any("ai-agents-for-beginners" in source for source in sources)
+
+
+def test_retrieve_documents_sets_chunk_id_to_none():
+    # 整篇文档检索路径没有真实 chunk_id，应显式返回 None
+    documents = load_documents(ROOT_DIR)
+    query = "tool use 是什么，和 agent 有什么关系？"
+
+    results = retrieve_documents(query, documents, top_k=5)
+
+    assert results
+    assert all(item.chunk_id is None for item in results)

@@ -70,6 +70,7 @@
 - 返回前 `top_k` 个最相关结果
 - 支持基于 `DocumentChunk` 的 chunk 级检索
 - 对同一 `source` 的检索结果增加数量限制，减少单篇文档重复占位
+- 检索结果支持携带 `chunk_id`，为后续更细粒度引用做准备
 
 5. Prompt 组装
 - 将检索结果组织成模型可读的上下文块
@@ -138,12 +139,14 @@
   - 章节总结命中
   - 学习路线问题命中 Agent 相关资料
   - 标题短语匹配后的稳定命中
+  - 整篇文档检索路径下 `chunk_id` 为 `None`
 - 覆盖 chunk 检索行为：
   - chunk 数量生成
   - 总结问题命中目标章节 chunk
   - Tool Use 问题命中目标模块 chunk
   - 同一 source 的 chunk 去重限制
   - chunk snippet 非空
+  - chunk 检索结果携带真实 `chunk_id`
 - 覆盖本地用户记忆读写：
   - 默认结构返回
   - 保存与读取一致性

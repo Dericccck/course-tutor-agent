@@ -57,3 +57,14 @@ def test_retrieve_chunks_returns_non_empty_snippets():
 
     assert results
     assert all(item.snippet.strip() for item in results)
+
+
+def test_retrieve_chunks_sets_real_chunk_ids():
+    # chunk 检索路径应返回真实 chunk_id，方便后续做更细粒度引用
+    chunks = load_document_chunks(ROOT_DIR)
+    query = "tool use 是什么？"
+
+    results = retrieve_chunks(query, chunks, top_k=5)
+
+    assert results
+    assert all(item.chunk_id for item in results)

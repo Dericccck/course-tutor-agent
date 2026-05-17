@@ -27,6 +27,10 @@ class Document(BaseModel):
 class RetrievedChunk(BaseModel):
     source: str = Field(..., description="Document source path") # 文档源路径
     title: str = Field(..., description="Document title") # 文件标题
+    chunk_id: str | None = Field(
+        default=None,
+        description="Optional chunk identifier for chunk-level retrieval results",
+    )
     snippet: str = Field(..., description="Mateched text snippet") # 匹配的文本片段
     score: float = Field(..., description="Retrieval score") # 信息检索得分
     tags: list[str] = Field(default_factory=list, description="Optional topic tags") # 可选主题标签
