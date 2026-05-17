@@ -15,7 +15,7 @@ from prompts import (
     build_study_plan_prompt,
 )
 from retriever import retrieve_documents, retrieve_chunks
-from schemas import AgentAnswer, Document, DocumentChunk
+from schemas import AgentAnswer, Document, DocumentChunk, RetrievedChunk
 
 def build_client(settings: Settings) -> OpenAI:
     client_kwargs = {"api_key": settings.api_key}
@@ -84,11 +84,10 @@ def ask_course_agent(question: str, documents: list[Document], settings: Setting
         answer = AgentAnswer(
             answer=raw_content,
             suggestions=[],
-            sources=[chunk.source for chunk in retrieved_chunks],
+            sources=[format_source_reference(chunk) for chunk in retrieved_chunks],
         )
     
-    if not answer.sources:
-        answer.sources = [chunk.source for chunk in retrieved_chunks]
+    answer.sources = [format_source_reference(chunk) for chunk in retrieved_chunks]
 
     return answer
 
@@ -135,3 +134,9 @@ def update_completed_topic(memory: dict, topic_title: str) -> None:
 
     if topic_title not in completed_topic:
         completed_topic.append(topic_title)
+        
+# 最终 sources 输出开始体现 chunk_id 了，之前是纯文档级的 source 路径，现在可以更细粒度地指向具体 chunk了
+def format_source_reference(chunk: RetrievedChunk) -> str:
+    if chunk.chunk_id:
+        return f"{chunk.source}#{chunk.chunk_id}"
+    return chunk.source

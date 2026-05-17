@@ -247,3 +247,78 @@ def test_ask_course_agent_updates_completed_topics_for_summary_with_chunks(monke
     )
 
     assert "07 Planning Design 学习摘要" in memory["completed_topics"]
+
+
+def test_format_source_reference_includes_chunk_id_when_present():
+    # 有 chunk_id 时，应拼成 source#chunk_id 的细粒度引用
+    chunk = make_chunk("04 Tool Use 学习摘要")
+    chunk.chunk_id = "04 Tool Use 学习摘要-chunk-1"
+
+    result = agent.format_source_reference(chunk)
+
+    assert result == "/tmp/04 Tool Use 学习摘要.md#04 Tool Use 学习摘要-chunk-1"
+
+
+def test_format_source_reference_returns_source_when_chunk_id_missing():
+    # 没有 chunk_id 时，应退回文档级路径
+    chunk = make_chunk("04 Tool Use 学习摘要")
+    chunk.chunk_id = None
+
+    result = agent.format_source_reference(chunk)
+
+    assert result == "/tmp/04 Tool Use 学习摘要.md"
+
+
+def test_ask_course_agent_overrides_model_sources_with_chunk_references(monkeypatch):
+    # 即使模型自己返回了 sources，也应以系统生成的 chunk 级引用为准
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+
+    retrieved = [
+        RetrievedChunk(
+            source="/tmp/04-tool-use.md",
+            title="04 Tool Use 学习摘要",
+            chunk_id="04 Tool Use 学习摘要-chunk-1",
+            snippet="tool use 相关片段",
+            score=10.0,
+            tags=["agent"],
+        )
+    ]
+
+    monkeypatch.setattr(
+        agent,
+        "retrieve_chunks",
+        lambda query, chunks, top_k: retrieved,
+    )
+    monkeypatch.setattr(
+        agent,
+        "retrieve_documents",
+        lambda query, documents, top_k: [make_chunk("不会被使用")],
+    )
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "正常回答", "suggestions": [], "sources": ["/tmp/old-source.md"]}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(),
+        memory={},
+        chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+    )
+
+    assert result.answer == "正常回答"
+    assert result.sources == ["/tmp/04-tool-use.md#04 Tool Use 学习摘要-chunk-1"]
