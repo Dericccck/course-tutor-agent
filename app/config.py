@@ -15,11 +15,13 @@ class Settings:
     base_url: str | None
     course_source_root: str
     retrieval_top_k: int
+    retrieval_mode: str
 
 
 def get_settings() -> Settings:
     llm_provider = os.getenv("LLM_PROVIDER", "openai").strip().lower()
     model_name = os.getenv("MODEL_NAME", "gpt-4.1-mini").strip()
+    retrieval_mode=os.getenv("RETRIEVAL_MODE", "chunk").strip().lower()
     course_source_root = os.getenv(
         "COURSE_SOURCE_ROOT",
         "/Users/a1-6/Desktop/AIAgent/code",
@@ -43,6 +45,7 @@ def get_settings() -> Settings:
         base_url=base_url,
         course_source_root=course_source_root,
         retrieval_top_k=retrieval_top_k,
+        retrieval_mode=retrieval_mode,
     )
 
 
@@ -54,4 +57,7 @@ def validate_settings(settings: Settings) -> None:
         if settings.llm_provider == "github":
             raise ValueError("GITHUB_TOKEN is required when LLM_PROVIDER=github.")
         raise ValueError("OPENAI_API_KEY is required when LLM_PROVIDER=openai.")
+    
+    if settings.retrieval_mode not in {"document", "chunk"}:
+        raise ValueError("RETRIEVAL_MODE must be 'document' or 'chunk'")
 

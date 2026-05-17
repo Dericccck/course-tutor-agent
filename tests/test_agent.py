@@ -42,7 +42,7 @@ def make_document_chunk(title: str = "Test Chunk") -> DocumentChunk:
     )
 
 
-def make_settings() -> SimpleNamespace:
+def make_settings(retrieval_mode: str = "chunk") -> SimpleNamespace:
     # 用一个简单对象模拟 Settings，避免依赖真实环境变量
     return SimpleNamespace(
         llm_provider="github",
@@ -51,6 +51,7 @@ def make_settings() -> SimpleNamespace:
         base_url="https://models.inference.ai.azure.com/",
         course_source_root="/tmp",
         retrieval_top_k=5,
+        retrieval_mode=retrieval_mode,
     )
 
 
@@ -199,6 +200,53 @@ def test_ask_course_agent_prefers_chunk_retrieval_when_chunks_provided(monkeypat
     assert called["chunk"] is True
     assert called["document"] is False
     assert result.answer == "chunk 检索结果"
+
+
+def test_ask_course_agent_uses_document_retrieval_when_mode_is_document(monkeypatch):
+    # 即使传入了 chunks，只要 retrieval_mode=document，也应走文档级检索
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+
+    called = {"chunk": False, "document": False}
+
+    def fake_retrieve_chunks(query, chunks, top_k):
+        called["chunk"] = True
+        return [make_chunk("不会被使用")]
+
+    def fake_retrieve_documents(query, documents, top_k):
+        called["document"] = True
+        return [make_chunk("04 Tool Use 学习摘要")]
+
+    monkeypatch.setattr(agent, "retrieve_chunks", fake_retrieve_chunks)
+    monkeypatch.setattr(agent, "retrieve_documents", fake_retrieve_documents)
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "document 检索结果", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(retrieval_mode="document"),
+        memory={},
+        chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+    )
+
+    assert called["document"] is True
+    assert called["chunk"] is False
+    assert result.answer == "document 检索结果"
 
 
 def test_ask_course_agent_updates_completed_topics_for_summary_with_chunks(monkeypatch):

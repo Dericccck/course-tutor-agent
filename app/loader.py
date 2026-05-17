@@ -89,36 +89,103 @@ def load_documents(root_dir: str) -> list[Document]:
     return documents
 
 def chunk_document(document: Document, max_chars: int = 500) -> list[DocumentChunk]:
-    # 1. 预处理：按双换行符切分出所有段落，并去除两边的空白字符，过滤掉空段落
-    paragraphs = [part.strip() for part in document.content.split("\n\n") if part.strip()]
+    # 1. 第一级切分：按 Markdown 标题章节切分
+    sections = split_markdown_sections(document.content)
     
-    # 2. 边界情况处理：如果文档是个空文件或没有有效段落
-    if not paragraphs:
-        # 直接把整篇空内容打包成一个块返回，防止后续逻辑报错
+    # 边缘情况：如果整篇文章没有一个 '#' 标题，导致切分不出章节
+    if not sections:
+        content = document.content.strip()
+        if not content:
+            return [] # 空白文档，直接返回空列表
+        # 没有章节但有内容，整体作为一整块返回
         return [
             DocumentChunk(
                 source=document.source,
                 title=document.title,
-                chunk_id=f"{document.source}-chunk-1",
-                content=document.content,
+                chunk_id=f"{document.title}-chunk-1",
+                content=content,
                 tags=document.tags,
             )
         ]
         
-    # 3. 初始化变量，准备进行贪婪聚合
-    chunks: list[DocumentChunk] = [] # 存放最终分块结果的列表
-    current_parts: list[str] = []    # 存放当前分块正在收集的段落
-    current_length = 0               # 当前分块的累计字符长度
-    chunk_index = 1                  # 分块计数器，用于生成唯一的 chunk_id
+    chunks: list[DocumentChunk] = [] 
+    current_parts: list[str] = []    # 用于收集并合并“小章节”的缓存列表
+    current_length = 0               # 当前合并小章节的累计字符长度
+    chunk_index = 1                  
     
-    # 4. 遍历每个段落进行聚合判断
-    for paragraph in paragraphs:  # 💡 帮你把原代码的拼写错误 paragragh 修正为了 paragraph
-        paragraph_length = len(paragraph)
+    for section in sections:  
+        section = section.strip()
+        if not section:
+            continue
         
-        # 判断如果把当前段落加进去，是否会超过单块最大字符限制 (max_chars)
-        # 加 2 是因为段落之间拼接时需要重新补上 "\n\n" 两个字符
-        if current_parts and current_length + paragraph_length + 2 > max_chars:
-            # 如果超限了，说明当前块已经“饱了”，先打包当前块
+        section_length = len(section)
+        
+        # --- 情况 A：单体章节字数直接爆表 (超限) ---
+        if section_length > max_chars:
+            # A-1: 先把之前积攒在 current_parts 里的那些“小章节”打包结算掉
+            if current_parts:
+                chunk_text = "\n\n".join(current_parts).strip()
+                chunks.append(
+                    DocumentChunk(
+                        source=document.source,
+                        title=document.title,
+                        chunk_id=f"{document.title}-chunk-{chunk_index}",
+                        content=chunk_text,
+                        tags=document.tags,
+                    )
+                )
+                chunk_index += 1
+                current_parts = [] # 清空，为后续腾地方
+                current_length = 0
+            
+            # A-2: 开启第二级切分：将这个巨无霸章节打碎成段落
+            paragraphs = [part.strip() for part in section.split("\n\n") if part.strip()]
+            temp_parts: list[str] = []
+            temp_length = 0
+            
+            for paragraph in paragraphs:
+                paragraph_length = len(paragraph)
+                
+                # 如果段落积攒起来也超限了，就打包段落块
+                if temp_parts and temp_length + paragraph_length + 2 > max_chars:
+                    chunk_text = "\n\n".join(temp_parts).strip()
+                    chunks.append(
+                        DocumentChunk(
+                            source=document.source,
+                            title=document.title,
+                            chunk_id=f"{document.title}-chunk-{chunk_index}",
+                            content=chunk_text,
+                            tags=document.tags,
+                        )
+                    )
+                    chunk_index += 1
+                    temp_parts = [paragraph]
+                    temp_length = paragraph_length
+                else:
+                    temp_parts.append(paragraph)
+                    # 修复点：确保只有在积攒了 2 个及以上段落时，才计入中间的 "\n\n" 长度
+                    temp_length += paragraph_length + (2 if len(temp_parts) > 1 else 0)
+                    
+            # 别忘了打包这个巨无霸章节最后残留的段落
+            if temp_parts:
+                chunk_text = "\n\n".join(temp_parts).strip()
+                chunks.append(
+                    DocumentChunk(
+                        source=document.source,
+                        title=document.title,
+                        chunk_id=f"{document.title}-chunk-{chunk_index}",
+                        content=chunk_text,
+                        tags=document.tags,
+                    )
+                )
+                chunk_index += 1
+                
+            continue # 处理完巨无霸章节，直接跳过后面的普通章节聚合逻辑，进入下一次循环
+        
+        # --- 情况 B：正常的普通小章节 (未超限)，贪婪聚合它们 ---
+        # 修复点：将原来的 paragraph_length 改为了符合当前作用域的 section_length
+        if current_parts and current_length + section_length + 2 > max_chars:
+            # 已经装不下了，打包当前累计的所有小章节
             chunk_text = "\n\n".join(current_parts).strip()
             chunks.append(
                 DocumentChunk(
@@ -129,15 +196,15 @@ def chunk_document(document: Document, max_chars: int = 500) -> list[DocumentChu
                     tags=document.tags,
                 )
             )
-            chunk_index += 1          # 计数器递增
-            current_parts = [paragraph] # 另起炉灶，将当前段落作为新一块的开头
-            current_length = paragraph_length # 重置新块的长度
+            chunk_index += 1          
+            current_parts = [section] # 修复点：把新章节作为新块的排头兵
+            current_length = section_length 
         else:
-            # 如果没超限，或者当前块还是空的，就把当前段落塞进当前块中
-            current_parts.append(paragraph)
-            current_length += paragraph_length + (2 if current_parts else 0)
+            current_parts.append(section)
+            # 修复点：同样修复了长度“抢跑”计算
+            current_length += section_length + (2 if len(current_parts) > 1 else 0)
         
-    # 5. 收尾工作：循环结束后，如果当前块里还有残留的段落，千万别漏了，打包带走
+    # 3. 终局收尾：把最后留在缓存里的普通小章节打包带走
     if current_parts:
         chunk_text = "\n\n".join(current_parts).strip()
         chunks.append(
@@ -160,3 +227,36 @@ def load_document_chunks(root_dir: str) -> list[DocumentChunk]:
         chunks.extend(chunk_document(document))
     
     return chunks
+
+
+# 整篇内容 -> markdown section -> chunk
+def split_markdown_sections(content: str) -> list[str]:
+    # 1. 将整篇 Markdown 内容按行切分
+    lines = content.splitlines()
+    sections: list[str] = []      # 存放最终切分出来的所有章节文本
+    current_lines: list[str] = []  # 缓存当前正在收集的章节行
+
+    for line in lines:
+        stripped = line.strip()
+        
+        # 2. 核心判断：如果当前行是标题（以 # 开头），且当前缓存里已经有内容了
+        if stripped.startswith("#") and current_lines:
+            # 说明遇到了下一个新章节的起点，先把老章节打包
+            section_text = "\n".join(current_lines).strip()
+            if section_text:
+                sections.append(section_text)
+            
+            # 另起炉灶：将当前的标题行作为新章节的第一行
+            current_lines = [line]
+        else:
+            # 3. 如果不是标题，或者是文档开头的第一个标题（此时 current_lines 为空）
+            # 直接将当前行追加到缓存中
+            current_lines.append(line)
+
+    # 4. 收尾工作：循环结束后，别忘了把最后留在缓存里的章节也打包带走
+    if current_lines:
+        section_text = "\n".join(current_lines).strip()
+        if section_text:
+            sections.append(section_text)
+
+    return sections

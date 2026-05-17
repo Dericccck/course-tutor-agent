@@ -29,7 +29,7 @@ def ask_course_agent(question: str, documents: list[Document], settings: Setting
     active_settings = settings or get_settings()
     validate_settings(active_settings)
 
-    if chunks is not None: # 如果调用方直接传入了切分后的 chunks，就用它们进行检索
+    if active_settings.retrieval_mode == "chunk" and chunks is not None: # 优先使用切分后的 chunk 进行检索，只有在没有提供 chunks 或者 retrieval_mode 设置为 document 时才退回到文档级检索
         retrieved_chunks = retrieve_chunks(
             query=question,
             chunks=chunks,

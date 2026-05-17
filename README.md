@@ -18,10 +18,11 @@
 
 当前 `v2` 第一阶段已完成以下升级：
 - 为 Markdown 课程资料新增 `DocumentChunk` 数据结构
-- 将整篇文档切分为多个 `chunk`
+- 将整篇文档按 Markdown 标题优先切分为多个 `chunk`
 - 新增 chunk 级检索与 snippet 提取
 - 为同一 source 增加结果去重限制，避免单篇文档占满结果位
-- 在主流程中优先使用 chunk 检索，保留整篇文档检索作为 fallback
+- 支持通过 `RETRIEVAL_MODE` 在 `document` / `chunk` 检索之间切换
+- 在主流程中优先使用 chunk 检索，并保留整篇文档检索作为 fallback
 - 为 chunk 检索和 chunk 主流程接入补充测试
 
 ## 项目背景
@@ -58,7 +59,8 @@
 - 支持将单篇 `Document` 切分为多个 `DocumentChunk`
 
 3. chunk 级检索准备
-- 按段落和长度累计对 Markdown 文档进行切块
+- 优先按 Markdown 标题边界切分 section
+- section 过长时，再退回按段落和长度累计切块
 - 为每个 chunk 生成独立的 `chunk_id`
 - 支持批量加载全部文档对应的 chunks
 
@@ -71,6 +73,7 @@
 - 支持基于 `DocumentChunk` 的 chunk 级检索
 - 对同一 `source` 的检索结果增加数量限制，减少单篇文档重复占位
 - 检索结果支持携带 `chunk_id`，为后续更细粒度引用做准备
+- 支持通过配置切换 `document` / `chunk` 两种检索模式
 
 5. Prompt 组装
 - 将检索结果组织成模型可读的上下文块
@@ -82,7 +85,8 @@
 - 支持 `OpenAI API` 和 `GitHub Models`
 - 将“用户问题 + 检索结果”发送给模型
 - 获取课程问答结果
-- 当前主流程优先使用 chunk 检索结果
+- 当前主流程默认优先使用 chunk 检索结果
+- 可通过 `RETRIEVAL_MODE` 切回整篇文档检索
 - 保留整篇文档检索作为 fallback
 
 7. 任务分流
@@ -140,6 +144,10 @@
   - 学习路线问题命中 Agent 相关资料
   - 标题短语匹配后的稳定命中
   - 整篇文档检索路径下 `chunk_id` 为 `None`
+- 覆盖配置校验行为：
+  - `RETRIEVAL_MODE=chunk`
+  - `RETRIEVAL_MODE=document`
+  - 非法检索模式值被明确拒绝
 - 覆盖 chunk 检索行为：
   - chunk 数量生成
   - 总结问题命中目标章节 chunk
@@ -147,6 +155,10 @@
   - 同一 source 的 chunk 去重限制
   - chunk snippet 非空
   - chunk 检索结果携带真实 `chunk_id`
+- 覆盖切块策略行为：
+  - Markdown 内容按标题边界切 section
+  - chunk 优先保留 section 边界
+  - 超长 section 退回按段落切块
 - 覆盖本地用户记忆读写：
   - 默认结构返回
   - 保存与读取一致性
@@ -160,6 +172,7 @@
   - summary 任务自动更新 completed_topics
   - 模型返回非法 JSON 时的 fallback 处理
   - 传入 chunks 时优先走 chunk 检索
+  - `RETRIEVAL_MODE=document` 时强制走 document 检索
   - summary 场景在 chunk 路径下也会更新 completed_topics
 - 覆盖学习进度与学习路线联动：
   - 已完成模块与未完成模块划分
@@ -198,6 +211,7 @@ course-tutor-agent/
     conftest.py
     test_agent.py
     test_chunk_retriever.py
+    test_config.py
     test_loader.py
     test_main_helpers.py
     test_memory.py
@@ -245,6 +259,7 @@ GITHUB_TOKEN=
 GITHUB_MODELS_BASE_URL=https://models.inference.ai.azure.com/
 COURSE_SOURCE_ROOT=/Users/a1-6/Desktop/AIAgent/code
 RETRIEVAL_TOP_K=5
+RETRIEVAL_MODE=chunk
 ```
 
 本地实际运行时，请在项目根目录创建 `.env`，并填写真实 key / token。  
