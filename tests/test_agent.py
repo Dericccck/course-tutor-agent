@@ -6,7 +6,7 @@
 from types import SimpleNamespace
 
 import agent
-from schemas import Document, RetrievedChunk
+from schemas import Document, DocumentChunk, RetrievedChunk
 
 
 def make_document(title: str = "Test Title") -> Document:
@@ -27,6 +27,17 @@ def make_chunk(title: str) -> RetrievedChunk:
         title=title,
         snippet=f"{title} 的相关片段",
         score=10.0,
+        tags=["agent"],
+    )
+
+
+def make_document_chunk(title: str = "Test Chunk") -> DocumentChunk:
+    # 构造一个最小可用的切块对象，供 chunk 检索路径测试使用
+    return DocumentChunk(
+        source="/tmp/test.md",
+        title=title,
+        chunk_id=f"{title}-chunk-1",
+        content=f"{title} 的 chunk 内容",
         tags=["agent"],
     )
 
@@ -141,3 +152,98 @@ def test_ask_course_agent_falls_back_when_model_returns_invalid_json(monkeypatch
 
     assert result.answer == "这不是合法 JSON"
     assert "/tmp/04 Tool Use 学习摘要.md" in result.sources
+
+
+def test_ask_course_agent_prefers_chunk_retrieval_when_chunks_provided(monkeypatch):
+    # 传入 chunks 时，应优先走 chunk 检索，而不是退回 document 检索
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+
+    called = {"chunk": False, "document": False}
+
+    def fake_retrieve_chunks(query, chunks, top_k):
+        called["chunk"] = True
+        return [make_chunk("04 Tool Use 学习摘要")]
+
+    def fake_retrieve_documents(query, documents, top_k):
+        called["document"] = True
+        return [make_chunk("不会被使用")]
+
+    monkeypatch.setattr(agent, "retrieve_chunks", fake_retrieve_chunks)
+    monkeypatch.setattr(agent, "retrieve_documents", fake_retrieve_documents)
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "chunk 检索结果", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(),
+        memory={},
+        chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+    )
+
+    assert called["chunk"] is True
+    assert called["document"] is False
+    assert result.answer == "chunk 检索结果"
+
+
+def test_ask_course_agent_updates_completed_topics_for_summary_with_chunks(monkeypatch):
+    # summary 场景在 chunk 检索路径下，也应把第一条标题写入 completed_topics
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+    monkeypatch.setattr(
+        agent,
+        "retrieve_chunks",
+        lambda query, chunks, top_k: [make_chunk("07 Planning Design 学习摘要")],
+    )
+    monkeypatch.setattr(
+        agent,
+        "retrieve_documents",
+        lambda query, documents, top_k: [make_chunk("不会被使用")],
+    )
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "总结内容", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    memory = {
+        "learning_goal": "",
+        "preferred_scope": "",
+        "completed_topics": [],
+    }
+
+    agent.ask_course_agent(
+        question="帮我总结 07-planning-design 这一节在讲什么",
+        documents=[make_document()],
+        settings=make_settings(),
+        memory=memory,
+        chunks=[make_document_chunk("07 Planning Design 学习摘要")],
+    )
+
+    assert "07 Planning Design 学习摘要" in memory["completed_topics"]

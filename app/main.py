@@ -2,7 +2,7 @@
 # 程序入口。先负责接收一个问题，然后调用 agent.py 返回结果。
 from agent import ask_course_agent
 from config import get_settings
-from loader import load_documents
+from loader import load_documents, load_document_chunks
 from memory import load_user_memory, save_user_memory, build_default_memory
 
 
@@ -109,10 +109,19 @@ def get_learning_stage(memory: dict) -> str:
 
 if __name__ == "__main__":
     settings = get_settings()
+    
+    # chunks = load_document_chunks(settings.course_source_root) # 预先切分文档，构建 chunks.json 以供后续快速加载
+    # print(f"Loaded {len(chunks)} document chunks")
+    # print("\n".join(chunk.content for chunk in chunks[:3])) # 打印前3个切分块看看长啥样
+    # print("" + "*" * 60 + "\n")
+    
     documents = load_documents(settings.course_source_root)
+    chunks = load_document_chunks(settings.course_source_root)
+    print(f"Loaded {len(documents)} documents")
+    print(f"Loaded {len(chunks)} chunks")
+    
     memory = load_user_memory()
 
-    print(f"Loaded {len(documents)} documents")
     print("课程辅导 Agent 已启动。\n")
     print_help()
     print_example_questions()
@@ -239,7 +248,7 @@ if __name__ == "__main__":
             print("问题不能为空。\n")
             continue
 
-        result = ask_course_agent(question, documents, settings=settings, memory=memory)
+        result = ask_course_agent(question, documents, settings=settings, memory=memory, chunks=chunks)
 
         print(f"\nQuestion: {question}\n")
         print("Answer:")

@@ -1,6 +1,6 @@
 # 扫描并读取课程资料。你的第一批重点就是读 notebook-summary.md、.md、部分 .ipynb。
 from pathlib import Path
-from schemas import Document
+from schemas import Document, DocumentChunk
 
 EXCLUDED_DIR_NAMES = {
     "venv",
@@ -87,3 +87,76 @@ def load_documents(root_dir: str) -> list[Document]:
             print(f"Skip {path}: {exc}")
 
     return documents
+
+def chunk_document(document: Document, max_chars: int = 500) -> list[DocumentChunk]:
+    # 1. 预处理：按双换行符切分出所有段落，并去除两边的空白字符，过滤掉空段落
+    paragraphs = [part.strip() for part in document.content.split("\n\n") if part.strip()]
+    
+    # 2. 边界情况处理：如果文档是个空文件或没有有效段落
+    if not paragraphs:
+        # 直接把整篇空内容打包成一个块返回，防止后续逻辑报错
+        return [
+            DocumentChunk(
+                source=document.source,
+                title=document.title,
+                chunk_id=f"{document.source}-chunk-1",
+                content=document.content,
+                tags=document.tags,
+            )
+        ]
+        
+    # 3. 初始化变量，准备进行贪婪聚合
+    chunks: list[DocumentChunk] = [] # 存放最终分块结果的列表
+    current_parts: list[str] = []    # 存放当前分块正在收集的段落
+    current_length = 0               # 当前分块的累计字符长度
+    chunk_index = 1                  # 分块计数器，用于生成唯一的 chunk_id
+    
+    # 4. 遍历每个段落进行聚合判断
+    for paragraph in paragraphs:  # 💡 帮你把原代码的拼写错误 paragragh 修正为了 paragraph
+        paragraph_length = len(paragraph)
+        
+        # 判断如果把当前段落加进去，是否会超过单块最大字符限制 (max_chars)
+        # 加 2 是因为段落之间拼接时需要重新补上 "\n\n" 两个字符
+        if current_parts and current_length + paragraph_length + 2 > max_chars:
+            # 如果超限了，说明当前块已经“饱了”，先打包当前块
+            chunk_text = "\n\n".join(current_parts).strip()
+            chunks.append(
+                DocumentChunk(
+                    source=document.source,
+                    title=document.title,
+                    chunk_id=f"{document.title}-chunk-{chunk_index}",
+                    content=chunk_text,
+                    tags=document.tags,
+                )
+            )
+            chunk_index += 1          # 计数器递增
+            current_parts = [paragraph] # 另起炉灶，将当前段落作为新一块的开头
+            current_length = paragraph_length # 重置新块的长度
+        else:
+            # 如果没超限，或者当前块还是空的，就把当前段落塞进当前块中
+            current_parts.append(paragraph)
+            current_length += paragraph_length + (2 if current_parts else 0)
+        
+    # 5. 收尾工作：循环结束后，如果当前块里还有残留的段落，千万别漏了，打包带走
+    if current_parts:
+        chunk_text = "\n\n".join(current_parts).strip()
+        chunks.append(
+            DocumentChunk(
+                source=document.source,
+                title=document.title,
+                chunk_id=f"{document.title}-chunk-{chunk_index}",
+                content=chunk_text,
+                tags=document.tags,
+            )
+        )
+    
+    return chunks
+
+def load_document_chunks(root_dir: str) -> list[DocumentChunk]:
+    documents = load_documents(root_dir)
+    chunks: list[DocumentChunk] = []
+    
+    for document in documents:
+        chunks.extend(chunk_document(document))
+    
+    return chunks

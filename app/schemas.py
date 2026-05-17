@@ -36,3 +36,11 @@ class AgentAnswer(BaseModel):
     answer: str = Field(..., description="Direct answer to the user question") # 直接回答用户的问题
     suggestions: list[str] = Field(default_factory=list, description="Follow-up study suggestions") # 后续研究建议
     sources: list[str] = Field(default_factory=list, description="Referenced document sources") # 引用的文档源
+
+# 切分后的检索单元
+class DocumentChunk(BaseModel):
+    source: str = Field(..., description="Original document source path") # 文档源路径
+    title: str = Field(..., description="Document title") # 文件标题
+    chunk_id: str = Field(..., description="Unique chunk identifier") # 唯一标识符
+    content: str = Field(..., description="Chunk text content") # 文本内容
+    tags: list[str] = Field(default_factory=list, description="Optional topic tags") # 可选主题标签

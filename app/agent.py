@@ -14,8 +14,8 @@ from prompts import (
     build_summary_prompt,
     build_study_plan_prompt,
 )
-from retriever import retrieve_documents
-from schemas import AgentAnswer, Document
+from retriever import retrieve_documents, retrieve_chunks
+from schemas import AgentAnswer, Document, DocumentChunk
 
 def build_client(settings: Settings) -> OpenAI:
     client_kwargs = {"api_key": settings.api_key}
@@ -25,11 +25,22 @@ def build_client(settings: Settings) -> OpenAI:
 
     return OpenAI(**client_kwargs)
 
-def ask_course_agent(question: str, documents: list[Document], settings: Settings | None = None, memory: dict | None = None,) -> AgentAnswer:
+def ask_course_agent(question: str, documents: list[Document], settings: Settings | None = None, memory: dict | None = None, chunks: list[DocumentChunk] | None = None,) -> AgentAnswer:
     active_settings = settings or get_settings()
     validate_settings(active_settings)
 
-    retrieved_chunks = retrieve_documents(query=question, documents=documents, top_k=active_settings.retrieval_top_k)
+    if chunks is not None: # 如果调用方直接传入了切分后的 chunks，就用它们进行检索
+        retrieved_chunks = retrieve_chunks(
+            query=question,
+            chunks=chunks,
+            top_k=active_settings.retrieval_top_k,
+        )
+    else: # 否则就退回到最原始的文档级检索（虽然效率更低，但至少能工作）
+        retrieved_chunks = retrieve_documents(
+            query=question,
+            documents=documents,
+            top_k=active_settings.retrieval_top_k,
+        )
 
     if not retrieved_chunks:
         return AgentAnswer(
