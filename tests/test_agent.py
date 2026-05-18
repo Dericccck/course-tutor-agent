@@ -249,6 +249,88 @@ def test_ask_course_agent_uses_document_retrieval_when_mode_is_document(monkeypa
     assert result.answer == "document 检索结果"
 
 
+def test_ask_course_agent_raises_for_vector_retrieval_mode(monkeypatch):
+    # vector 模式下如果没有传入 vector_store，应明确报错
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+
+    try:
+        agent.ask_course_agent(
+            question="tool use 是什么？",
+            documents=[make_document()],
+            settings=make_settings(retrieval_mode="vector"),
+            memory={},
+            chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+            vector_store=None,  # 即使不传 vector_store，也应优先抛出未实现异常，而不是因为缺参数而抛 ValueError
+        )
+        assert False, "ask_course_agent should raise ValueError when vector_store is missing"
+    except ValueError as exc:
+        assert "Vector store must be provided" in str(exc)
+
+
+def test_ask_course_agent_uses_vector_store_when_mode_is_vector(monkeypatch):
+    # vector 模式下，如果传入 vector_store，应使用它的 search 结果继续主流程
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+
+    called = {"document": False, "chunk": False, "vector": False}
+
+    def fake_retrieve_documents(query, documents, top_k):
+        called["document"] = True
+        return [make_chunk("不会被使用")]
+
+    def fake_retrieve_chunks(query, chunks, top_k):
+        called["chunk"] = True
+        return [make_chunk("不会被使用")]
+
+    class FakeVectorStore:
+        def search(self, query, top_k=5):
+            called["vector"] = True
+            return [
+                RetrievedChunk(
+                    source="/tmp/vector-source.md",
+                    title="Vector 命中结果",
+                    chunk_id="vector-chunk-1",
+                    snippet="向量检索命中的片段",
+                    score=9.5,
+                    tags=["agent"],
+                )
+            ]
+
+    monkeypatch.setattr(agent, "retrieve_documents", fake_retrieve_documents)
+    monkeypatch.setattr(agent, "retrieve_chunks", fake_retrieve_chunks)
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "vector 检索结果", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(retrieval_mode="vector"),
+        memory={},
+        chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+        vector_store=FakeVectorStore(),
+    )
+
+    assert called["vector"] is True
+    assert called["document"] is False
+    assert called["chunk"] is False
+    assert result.answer == "vector 检索结果"
+    assert result.sources == ["/tmp/vector-source.md#vector-chunk-1"]
+
+
 def test_ask_course_agent_updates_completed_topics_for_summary_with_chunks(monkeypatch):
     # summary 场景在 chunk 检索路径下，也应把第一条标题写入 completed_topics
     monkeypatch.setattr(agent, "validate_settings", lambda settings: None)

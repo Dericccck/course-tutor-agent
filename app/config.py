@@ -58,6 +58,6 @@ def validate_settings(settings: Settings) -> None:
             raise ValueError("GITHUB_TOKEN is required when LLM_PROVIDER=github.")
         raise ValueError("OPENAI_API_KEY is required when LLM_PROVIDER=openai.")
     
-    if settings.retrieval_mode not in {"document", "chunk"}:
+    if settings.retrieval_mode not in {"document", "chunk", "vector"}:
         raise ValueError("RETRIEVAL_MODE must be 'document' or 'chunk'")
 

@@ -34,6 +34,13 @@ def test_validate_settings_accepts_document_retrieval_mode():
     validate_settings(settings)
 
 
+def test_validate_settings_accepts_vector_retrieval_mode():
+    # retrieval_mode=vector 作为未来预留接口，也应通过配置校验
+    settings = make_settings(retrieval_mode="vector")
+
+    validate_settings(settings)
+
+
 def test_validate_settings_rejects_invalid_retrieval_mode():
     # retrieval_mode 非法值应被明确拒绝
     settings = make_settings(retrieval_mode="invalid-mode")

@@ -1,6 +1,7 @@
 # agent.py：调模型
 # 串主流程：读取问题、调检索、组装上下文、调模型、返回结构化结果
 import json
+from vector_store import VectorStore
 
 # pyrefly: ignore [missing-import]
 from openai import OpenAI
@@ -25,11 +26,25 @@ def build_client(settings: Settings) -> OpenAI:
 
     return OpenAI(**client_kwargs)
 
-def ask_course_agent(question: str, documents: list[Document], settings: Settings | None = None, memory: dict | None = None, chunks: list[DocumentChunk] | None = None,) -> AgentAnswer:
+def ask_course_agent(
+    question: str, 
+    documents: list[Document], 
+    settings: Settings | None = None, 
+    memory: dict | None = None, 
+    chunks: list[DocumentChunk] | None = None,
+    vector_store: VectorStore | None = None,
+    ) -> AgentAnswer:
     active_settings = settings or get_settings()
     validate_settings(active_settings)
 
-    if active_settings.retrieval_mode == "chunk" and chunks is not None: # 优先使用切分后的 chunk 进行检索，只有在没有提供 chunks 或者 retrieval_mode 设置为 document 时才退回到文档级检索
+    if active_settings.retrieval_mode == "vector": # 目前向量检索还没做，所以先直接报错，等后续完善了再放开这个选项
+        if vector_store is None:
+            raise ValueError("Vector store must be provided when RETRIEVAL_MODE=vector.")
+        retrieved_chunks = vector_store.search(
+            query=question, 
+            top_k=active_settings.retrieval_top_k,
+        )
+    elif active_settings.retrieval_mode == "chunk" and chunks is not None: # 优先使用切分后的 chunk 进行检索，只有在没有提供 chunks 或者 retrieval_mode 设置为 document 时才退回到文档级检索
         retrieved_chunks = retrieve_chunks(
             query=question,
             chunks=chunks,
