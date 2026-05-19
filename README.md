@@ -25,6 +25,17 @@
 - 在主流程中优先使用 chunk 检索，并保留整篇文档检索作为 fallback
 - 为 chunk 检索和 chunk 主流程接入补充测试
 
+## V2 Phase 2
+
+当前 `v2` 第二阶段已完成以下骨架准备：
+- 新增 `embedding_provider.py`，拆分 embedding provider 相关职责
+- 新增 `EmbeddingProvider` 协议与 `NotImplementedEmbeddingProvider`
+- 新增 `build_embedding_text(...)`，统一构造 embedding 输入文本
+- 新增 `VectorStore` 协议、`FakeVectorStore` 与 `InMemoryVectorStore`
+- `agent.py` 已支持注入 `vector_store`，为未来真实向量检索预留主流程接口
+- `RETRIEVAL_MODE=vector` 已打通到主流程，但当前仍依赖占位 provider
+- 为 vector provider / store 骨架与最小行为补充测试
+
 ## 项目背景
 
 这个项目主要面向当前仓库中的课程资料，例如：
@@ -74,6 +85,7 @@
 - 对同一 `source` 的检索结果增加数量限制，减少单篇文档重复占位
 - 检索结果支持携带 `chunk_id`，为后续更细粒度引用做准备
 - 支持通过配置切换 `document` / `chunk` 两种检索模式
+- 已为未来的 `vector` 检索模式预留主流程分支
 
 5. Prompt 组装
 - 将检索结果组织成模型可读的上下文块
@@ -88,6 +100,7 @@
 - 当前主流程默认优先使用 chunk 检索结果
 - 可通过 `RETRIEVAL_MODE` 切回整篇文档检索
 - 保留整篇文档检索作为 fallback
+- `RETRIEVAL_MODE=vector` 时已支持注入 `vector_store`
 
 7. 任务分流
 - 支持按问题类型区分：
@@ -147,6 +160,7 @@
 - 覆盖配置校验行为：
   - `RETRIEVAL_MODE=chunk`
   - `RETRIEVAL_MODE=document`
+  - `RETRIEVAL_MODE=vector`
   - 非法检索模式值被明确拒绝
 - 覆盖 chunk 检索行为：
   - chunk 数量生成
@@ -155,6 +169,12 @@
   - 同一 source 的 chunk 去重限制
   - chunk snippet 非空
   - chunk 检索结果携带真实 `chunk_id`
+- 覆盖 vector provider / store 骨架行为：
+  - `build_embedding_text(...)` 包含标题、标签和正文
+  - 空标签时稳定输出“无”
+  - `NotImplementedEmbeddingProvider` 明确抛出未实现异常
+  - `FakeVectorStore` 可保存 chunks 并返回预设结果
+  - `InMemoryVectorStore.index_chunks(...)` 会调用 embedding provider
 - 覆盖切块策略行为：
   - Markdown 内容按标题边界切 section
   - chunk 优先保留 section 边界
@@ -173,6 +193,8 @@
   - 模型返回非法 JSON 时的 fallback 处理
   - 传入 chunks 时优先走 chunk 检索
   - `RETRIEVAL_MODE=document` 时强制走 document 检索
+  - `RETRIEVAL_MODE=vector` 时如果没传 `vector_store` 会明确报错
+  - `RETRIEVAL_MODE=vector` 时会优先使用 `vector_store.search(...)`
   - summary 场景在 chunk 路径下也会更新 completed_topics
 - 覆盖学习进度与学习路线联动：
   - 已完成模块与未完成模块划分
@@ -199,12 +221,14 @@ course-tutor-agent/
   app/
     agent.py
     config.py
+    embedding_provider.py
     loader.py
     main.py
     memory.py
     prompts.py
     retriever.py
     schemas.py
+    vector_store.py
   data/
     user_memory.json
   tests/
@@ -219,6 +243,7 @@ course-tutor-agent/
     test_retriever.py
     test_study_plan_memory.py
     test_task_routing.py
+    test_vector_store.py
 ```
 
 ## 目前可运行的内容
@@ -270,7 +295,7 @@ RETRIEVAL_MODE=chunk
 接下来会按以下顺序继续完善：
 
 1. 继续提升 chunk 检索质量与引用精度
-2. 视需要引入 embedding / 向量检索，升级为更正式的 RAG
+2. 接入第一个真实 embedding provider，升级为更正式的向量检索
 3. 扩展测试覆盖到更多实际问答场景
 4. 继续完善学习路径建议和上下文管理
 5. 逐步增强长期记忆与学习进度利用
