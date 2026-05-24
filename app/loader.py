@@ -18,7 +18,7 @@ def is_excluded_path(path: Path) -> bool:
     return any(part in EXCLUDED_DIR_NAMES for part in path.parts)
 
 # 扫描目录下所有 .md 文件。
-def iter_course_files(root_dir: str) -> list[Path]:
+def iter_course_files(root_dir: str, include_dirs: list[str] | None = None,) -> list[Path]:
     root = Path(root_dir)
     files: list[Path] = []
 
@@ -28,6 +28,10 @@ def iter_course_files(root_dir: str) -> list[Path]:
         if not path.is_file():
             continue
         if is_excluded_path(path):
+            continue
+        if include_dirs and not is_included_course_path(path, include_dirs):
+            continue
+        if not is_allowed_course_file(path):
             continue
         files.append(path)
     return sorted(files)
@@ -77,10 +81,10 @@ def load_markdown_file(path: str | Path) -> Document: # 既可以接收一个普
     )
 
 # 批量加载所有文档，形成统一数据列表。
-def load_documents(root_dir: str) -> list[Document]:
+def load_documents(root_dir: str, include_dirs: list[str] | None = None,) -> list[Document]:
     documents: list[Document] = []
 
-    for path in iter_course_files(root_dir):
+    for path in iter_course_files(root_dir, include_dirs):
         try:
             documents.append(load_markdown_file(path))
         except Exception as exc:
@@ -219,8 +223,8 @@ def chunk_document(document: Document, max_chars: int = 500) -> list[DocumentChu
     
     return chunks
 
-def load_document_chunks(root_dir: str) -> list[DocumentChunk]:
-    documents = load_documents(root_dir)
+def load_document_chunks(root_dir: str, include_dirs: list[str] | None = None,) -> list[DocumentChunk]:
+    documents = load_documents(root_dir, include_dirs)
     chunks: list[DocumentChunk] = []
     
     for document in documents:
@@ -260,3 +264,17 @@ def split_markdown_sections(content: str) -> list[str]:
             sections.append(section_text)
 
     return sections
+
+# 过滤扫描到的文件路径，确保只处理那些包含在 course_include_dirs 列表中的目录下的文件。这有助于我们聚焦在课程内容相关的文档上，而不被项目实战等其他类型的文档干扰。 （扫描的文件目录白名单）
+def is_included_course_path(path: Path, include_dirs: list[str]) -> bool:
+    path_parts = set(path.parts)
+    return any(include_dir in path_parts for include_dir in include_dirs)
+
+ALLOWED_MARKDOWN_FILENAMES = {
+    "notebook-summary.md",
+    "knowledge-progression-map.md",
+    "technology-depth-in-1-and-2-folders.md",
+}
+
+def is_allowed_course_file(path: Path) -> bool:
+    return path.name in ALLOWED_MARKDOWN_FILENAMES

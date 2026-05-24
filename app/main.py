@@ -4,6 +4,8 @@ from agent import ask_course_agent
 from config import get_settings
 from loader import load_documents, load_document_chunks
 from memory import load_user_memory, save_user_memory, build_default_memory
+from embedding_provider import build_embedding_provider
+from vector_store import InMemoryVectorStore
 
 
 def print_help() -> None:
@@ -109,16 +111,17 @@ def get_learning_stage(memory: dict) -> str:
 
 if __name__ == "__main__":
     settings = get_settings()
-    
-    # chunks = load_document_chunks(settings.course_source_root) # 预先切分文档，构建 chunks.json 以供后续快速加载
-    # print(f"Loaded {len(chunks)} document chunks")
-    # print("\n".join(chunk.content for chunk in chunks[:3])) # 打印前3个切分块看看长啥样
-    # print("" + "*" * 60 + "\n")
-    
-    documents = load_documents(settings.course_source_root)
-    chunks = load_document_chunks(settings.course_source_root)
+    documents = load_documents(settings.course_source_root, include_dirs=settings.course_include_dirs)
+    chunks = load_document_chunks(settings.course_source_root, include_dirs=settings.course_include_dirs)
     print(f"Loaded {len(documents)} documents")
     print(f"Loaded {len(chunks)} chunks")
+    
+    vector_store = None
+    
+    if settings.retrieval_mode == "vector":
+        embedding_provider = build_embedding_provider(settings.embedding_provider, settings.embedding_model_name, settings.embedding_cache_dir) # 根据配置构建对应的 embedding provider 实例
+        vector_store = InMemoryVectorStore(embedding_provider)
+        vector_store.index_chunks(chunks)
     
     memory = load_user_memory()
 
@@ -248,7 +251,7 @@ if __name__ == "__main__":
             print("问题不能为空。\n")
             continue
 
-        result = ask_course_agent(question, documents, settings=settings, memory=memory, chunks=chunks)
+        result = ask_course_agent(question, documents, settings=settings, memory=memory, chunks=chunks, vector_store=vector_store,)
 
         print(f"\nQuestion: {question}\n")
         print("Answer:")
