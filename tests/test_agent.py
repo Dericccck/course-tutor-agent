@@ -529,6 +529,107 @@ def test_ask_course_agent_raises_when_hybrid_mode_missing_vector_store(monkeypat
         assert "Vector store must be provided" in str(exc)
 
 
+def test_narrow_summary_results_keeps_only_first_source():
+    retrieved_chunks = [
+        RetrievedChunk(
+            source="/tmp/07-planning-design.md",
+            title="07 Planning Design 学习摘要",
+            chunk_id="07-1",
+            snippet="target-1",
+            score=10.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/07-planning-design.md",
+            title="07 Planning Design 学习摘要",
+            chunk_id="07-2",
+            snippet="target-2",
+            score=9.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/other.md",
+            title="Other",
+            chunk_id="other-1",
+            snippet="other",
+            score=8.0,
+            tags=["rag"],
+        ),
+    ]
+
+    narrowed = agent.narrow_summary_results(retrieved_chunks)
+
+    assert len(narrowed) == 2
+    assert all(item.source == "/tmp/07-planning-design.md" for item in narrowed)
+
+
+def test_ask_course_agent_narrows_summary_results_to_target_source(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+
+    retrieved = [
+        RetrievedChunk(
+            source="/tmp/07-planning-design.md",
+            title="07 Planning Design 学习摘要",
+            chunk_id="07-1",
+            snippet="target-1",
+            score=10.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/07-planning-design.md",
+            title="07 Planning Design 学习摘要",
+            chunk_id="07-2",
+            snippet="target-2",
+            score=9.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/other.md",
+            title="Other",
+            chunk_id="other-1",
+            snippet="other",
+            score=8.0,
+            tags=["rag"],
+        ),
+    ]
+
+    monkeypatch.setattr(
+        agent,
+        "retrieve_chunks",
+        lambda query, chunks, top_k: retrieved,
+    )
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "总结内容", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="帮我总结 07-planning-design 这一节在讲什么",
+        documents=[make_document()],
+        settings=make_settings(retrieval_mode="chunk"),
+        memory={},
+        chunks=[make_document_chunk("07 Planning Design 学习摘要")],
+    )
+
+    assert result.sources == [
+        "/tmp/07-planning-design.md#07-1",
+        "/tmp/07-planning-design.md#07-2",
+    ]
+
+
 def test_format_source_reference_includes_chunk_id_when_present():
     # 有 chunk_id 时，应拼成 source#chunk_id 的细粒度引用
     chunk = make_chunk("04 Tool Use 学习摘要")

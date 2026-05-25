@@ -107,6 +107,7 @@
 - 保留整篇文档检索作为 fallback
 - `RETRIEVAL_MODE=vector` 时已支持注入 `vector_store`
 - `RETRIEVAL_MODE=hybrid` 时会合并 chunk 检索与向量检索结果
+- `RETRIEVAL_MODE=hybrid` 时会先宽召回，再按优先级与同源限制合并结果
 
 7. 向量检索链路
 - 支持通过 `build_embedding_text(...)` 统一构造 embedding 输入
@@ -216,6 +217,7 @@
   - `merge_retrieval_results(...)` 会按优先级合并并去重
   - `RETRIEVAL_MODE=hybrid` 时会同时使用 chunk 检索和向量检索
   - `RETRIEVAL_MODE=hybrid` 时如果缺少 `vector_store` 会明确报错
+  - summary 场景会收窄到首条命中的目标文档来源，避免跨文档稀释总结
   - summary 场景在 chunk 路径下也会更新 completed_topics
 - 覆盖学习进度与学习路线联动：
   - 已完成模块与未完成模块划分

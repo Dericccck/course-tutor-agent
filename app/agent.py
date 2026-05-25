@@ -7,6 +7,7 @@ from vector_store import VectorStore
 from openai import OpenAI
 # pyrefly: ignore [missing-import]
 from pydantic import ValidationError
+from pathlib import Path
 
 from config import Settings, get_settings, validate_settings
 from prompts import (
@@ -26,22 +27,68 @@ def build_client(settings: Settings) -> OpenAI:
 
     return OpenAI(**client_kwargs)
 
+# 这个函数的作用是从给定的 source 路径中提取课程组信息。我们假设课程组的信息包含在路径的某个部分，并且以 "1-" 或 "2-" 开头。通过这个函数，我们可以在后续的检索结果排序中优先展示与用户问题相关的课程组内容，从而提升用户体验和检索结果的相关性。
+def get_course_group(source: str) -> str | None:
+    parts = Path(source).parts
+    for part in parts:
+        if part.startswith(("1-", "2-")):
+            return part
+    return None
+
+# 这个函数的作用是对检索到的结果进行过滤和排序，优先保留与首条结果来自同一课程组的内容。这样做的好处是可以提升检索结果的相关性和一致性，尤其是在用户提问中包含了特定课程组信息的情况下。通过这种方式，我们可以更好地满足用户的查询意图，提供更精准和有针对性的回答。
+def narrow_summary_results(retrieved_chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
+    if not retrieved_chunks:
+        return []
+
+    target_source = retrieved_chunks[0].source
+    same_source = [
+        item for item in retrieved_chunks
+        if item.source == target_source
+    ]
+    return same_source or retrieved_chunks
+
 # 混合检索 用 retrieve_chunks(...) 取一份结果，用 vector_store.search(...) 再取一份结果，然后把两份结果合并去重，最终返回 top_k 条结果。这样做的好处是：
 # 1. retrieve_chunks(...) 的结果通常更精准，因为它直接基于文本内容进行匹配，能够捕捉到一些细粒度的相关信息；而 vector_store.search(...) 的结果可能更全面，因为它基于向量表示进行匹配。通过混合检索，我们可以兼顾精准性和全面性，提升整体的检索效果。
 # 2. retrieve_chunks(...) 的结果可以作为 vector_store.search(...) 的补充，当 retrieve_chunks(...) 没有检索到足够的相关内容时，vector_store.search(...) 可以提供更多的候选项，增加找到相关信息的机会。反过来，当 retrieve_chunks(...) 已经检索到足够的相关内容时，我们也可以通过混合检索来引入一些 vector_store.search(...) 的结果，增加多样性和覆盖面。
-def merge_retrieval_results(primary: list[RetrievedChunk], secondary: list[RetrievedChunk], top_k: int) -> list[RetrievedChunk]:
+def merge_retrieval_results(
+    primary: list[RetrievedChunk],
+    secondary: list[RetrievedChunk],
+    top_k: int,
+    max_per_source: int = 2,
+) -> list[RetrievedChunk]:
     merged: list[RetrievedChunk] = []
-    seen: set[tuple[str, str | None]] = set()  # 用于去重，记录已经添加过的 (source, chunk_id) 组合
+    seen: set[tuple[str, str | None]] = set() # 用于去重，记录已经添加过的 (source, chunk_id) 组合
+    source_counts: dict[str, int] = {} # 记录每个 source 已经添加了多少条结果 (同源限流)
 
-    for item in primary + secondary:
+    primary_group = get_course_group(primary[0].source) if primary else None
+
+    same_group_secondary: list[RetrievedChunk] = []
+    other_group_secondary: list[RetrievedChunk] = []
+    # 如果首条来自：2-3-ai-agents-for-beginners. 那后面的补充结果会优先保留同属 2-3 的模块，再把 2-2 的结果往后放
+    for item in secondary:# 先把 secondary 里的结果根据是否与 primary 的课程组相同分成两类，这样我们就可以在后续的排序中优先保留同组的结果，进一步提升相关性
+        if primary_group and get_course_group(item.source) == primary_group: 
+            same_group_secondary.append(item)
+        else:
+            other_group_secondary.append(item)
+
+    candidates = primary + same_group_secondary + other_group_secondary
+
+    for item in candidates: # 按照 primary 结果优先、同组 secondary 结果次之、其他 secondary 结果最后的顺序来遍历候选项，依次添加到 merged 结果中，同时进行去重和同源限流，直到达到 top_k 条结果为止。
         key = (item.source, item.chunk_id)
         if key in seen:
             continue
+
+        count = source_counts.get(item.source, 0)
+        if count >= max_per_source: # 同一个 source 最多保留 2 条, 仍然优先保留 primary 里的结果,secondary 只作为补充
+            continue
+
         seen.add(key)
         merged.append(item)
+        source_counts[item.source] = count + 1
 
         if len(merged) >= top_k:
             break
+
     return merged
 
 def ask_course_agent(
@@ -60,17 +107,18 @@ def ask_course_agent(
             raise ValueError("Chunks data must be provided when RETRIEVAL_MODE=hybrid.")
         if vector_store is None:
             raise ValueError("Vector store must be provided when RETRIEVAL_MODE=hybrid.")
+        candidate_top_k = max(active_settings.retrieval_top_k * 3, 10)
         # 这里先让 lexical_results 放前面，是因为：标题/关键词精确命中对课程问答很重要    vector 先作为补充召回
         lexical_results = retrieve_chunks(
             query=question,
             chunks=chunks,
-            top_k=active_settings.retrieval_top_k,
+            top_k=candidate_top_k,
         )
         vector_results = vector_store.search(
             query=question,
-            top_k=active_settings.retrieval_top_k,
+            top_k=candidate_top_k,
         )
-        retrieved_chunks = merge_retrieval_results(lexical_results, vector_results, top_k=active_settings.retrieval_top_k)
+        retrieved_chunks = merge_retrieval_results(lexical_results, vector_results, top_k=active_settings.retrieval_top_k) # lexical 定主轴，vector 做补充
     elif active_settings.retrieval_mode == "vector": # 目前向量检索还没做，所以先直接报错，等后续完善了再放开这个选项
         if vector_store is None:
             raise ValueError("Vector store must be provided when RETRIEVAL_MODE=vector.")
@@ -100,6 +148,8 @@ def ask_course_agent(
     
     client = build_client(active_settings)
     task_type = detect_task_type(question)
+    if task_type == "summary":
+        retrieved_chunks = narrow_summary_results(retrieved_chunks)
     if task_type == "summary":
         user_prompt = build_summary_prompt(question, retrieved_chunks, memory=memory)
     elif task_type == "study_plan":
