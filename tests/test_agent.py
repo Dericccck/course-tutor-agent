@@ -52,6 +52,10 @@ def make_settings(retrieval_mode: str = "chunk") -> SimpleNamespace:
         course_source_root="/tmp",
         retrieval_top_k=5,
         retrieval_mode=retrieval_mode,
+        embedding_provider="hash",
+        embedding_model_name="BAAI/bge-m3",
+        embedding_cache_dir=None,
+        course_include_dirs=["2-3-ai-agents-for-beginners"],
     )
 
 
@@ -377,6 +381,152 @@ def test_ask_course_agent_updates_completed_topics_for_summary_with_chunks(monke
     )
 
     assert "07 Planning Design 学习摘要" in memory["completed_topics"]
+
+
+def test_merge_retrieval_results_deduplicates_and_preserves_priority():
+    primary = [
+        RetrievedChunk(
+            source="/tmp/tool.md",
+            title="04 Tool Use 学习摘要",
+            chunk_id="tool-1",
+            snippet="primary",
+            score=10.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/framework.md",
+            title="02 Explore Agentic Frameworks 学习摘要",
+            chunk_id="framework-1",
+            snippet="primary-2",
+            score=9.0,
+            tags=["agent"],
+        ),
+    ]
+    secondary = [
+        RetrievedChunk(
+            source="/tmp/tool.md",
+            title="04 Tool Use 学习摘要",
+            chunk_id="tool-1",
+            snippet="duplicate",
+            score=8.5,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/rag.md",
+            title="05 Agentic RAG 学习摘要",
+            chunk_id="rag-1",
+            snippet="secondary",
+            score=8.0,
+            tags=["rag"],
+        ),
+    ]
+
+    merged = agent.merge_retrieval_results(primary, secondary, top_k=3)
+
+    assert len(merged) == 3
+    assert merged[0].chunk_id == "tool-1"
+    assert merged[1].chunk_id == "framework-1"
+    assert merged[2].chunk_id == "rag-1"
+
+
+def test_ask_course_agent_uses_hybrid_retrieval_when_mode_is_hybrid(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+
+    called = {"chunk": False, "document": False, "vector": False}
+
+    def fake_retrieve_chunks(query, chunks, top_k):
+        called["chunk"] = True
+        return [
+            RetrievedChunk(
+                source="/tmp/tool.md",
+                title="04 Tool Use 学习摘要",
+                chunk_id="tool-1",
+                snippet="lexical result",
+                score=10.0,
+                tags=["agent"],
+            )
+        ]
+
+    def fake_retrieve_documents(query, documents, top_k):
+        called["document"] = True
+        return [make_chunk("不会被使用")]
+
+    class FakeVectorStore:
+        def search(self, query, top_k=5):
+            called["vector"] = True
+            return [
+                RetrievedChunk(
+                    source="/tmp/tool.md",
+                    title="04 Tool Use 学习摘要",
+                    chunk_id="tool-1",
+                    snippet="duplicate vector result",
+                    score=9.5,
+                    tags=["agent"],
+                ),
+                RetrievedChunk(
+                    source="/tmp/framework.md",
+                    title="02 Explore Agentic Frameworks 学习摘要",
+                    chunk_id="framework-1",
+                    snippet="vector result",
+                    score=8.5,
+                    tags=["agent"],
+                ),
+            ]
+
+    monkeypatch.setattr(agent, "retrieve_chunks", fake_retrieve_chunks)
+    monkeypatch.setattr(agent, "retrieve_documents", fake_retrieve_documents)
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "hybrid 检索结果", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(retrieval_mode="hybrid"),
+        memory={},
+        chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+        vector_store=FakeVectorStore(),
+    )
+
+    assert called["chunk"] is True
+    assert called["vector"] is True
+    assert called["document"] is False
+    assert result.answer == "hybrid 检索结果"
+    assert result.sources == [
+        "/tmp/tool.md#tool-1",
+        "/tmp/framework.md#framework-1",
+    ]
+
+
+def test_ask_course_agent_raises_when_hybrid_mode_missing_vector_store(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+
+    try:
+        agent.ask_course_agent(
+            question="tool use 是什么？",
+            documents=[make_document()],
+            settings=make_settings(retrieval_mode="hybrid"),
+            memory={},
+            chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+            vector_store=None,
+        )
+        assert False, "ask_course_agent should raise ValueError when hybrid vector_store is missing"
+    except ValueError as exc:
+        assert "Vector store must be provided" in str(exc)
 
 
 def test_format_source_reference_includes_chunk_id_when_present():

@@ -118,7 +118,7 @@ if __name__ == "__main__":
     
     vector_store = None
     
-    if settings.retrieval_mode == "vector":
+    if settings.retrieval_mode in {"vector", "hybrid"}:
         embedding_provider = build_embedding_provider(settings.embedding_provider, settings.embedding_model_name, settings.embedding_cache_dir) # 根据配置构建对应的 embedding provider 实例
         vector_store = InMemoryVectorStore(embedding_provider)
         vector_store.index_chunks(chunks)

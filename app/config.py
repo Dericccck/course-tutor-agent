@@ -71,8 +71,8 @@ def validate_settings(settings: Settings) -> None:
             raise ValueError("GITHUB_TOKEN is required when LLM_PROVIDER=github.")
         raise ValueError("OPENAI_API_KEY is required when LLM_PROVIDER=openai.")
     
-    if settings.retrieval_mode not in {"document", "chunk", "vector"}: # 目前支持三种检索模式：最原始的文档级检索（document），更细粒度的切块级检索（chunk），以及基于向量搜索的检索（vector）。用户可以根据自己的需求和数据规模来选择合适的检索模式。一般来说，chunk 模式在大多数情况下会有更好的性能和相关性，而 vector 模式则适用于需要处理非常大规模文本数据或者需要更复杂语义理解的场景。
-        raise ValueError("RETRIEVAL_MODE must be 'document', 'chunk', or 'vector'.")
+    if settings.retrieval_mode not in {"document", "chunk", "vector", "hybrid"}: # 目前支持三种检索模式：最原始的文档级检索（document），更细粒度的切块级检索（chunk），以及基于向量搜索的检索（vector）。用户可以根据自己的需求和数据规模来选择合适的检索模式。一般来说，chunk 模式在大多数情况下会有更好的性能和相关性，而 vector 模式则适用于需要处理非常大规模文本数据或者需要更复杂语义理解的场景。
+        raise ValueError("RETRIEVAL_MODE must be 'document', 'chunk', 'vector', or 'hybrid'.")
     
     if settings.embedding_provider not in {"hash", "sentence-transformers"}: # 目前先支持两种 embedding 提供商，后续如果需要支持更多，可以继续扩展这个条件判断。
         raise ValueError(

@@ -2,7 +2,7 @@
 
 一个基于本地课程资料构建的课程辅导 Agent 项目。
 
-项目目标是围绕当前仓库中的 AI 学习内容，逐步实现一个不依赖 `LangChain`、`LangGraph` 的实战型 Agent。当前已经完成 `v1` 的可交互 CLI 主链路，并开始进入 `v2` 的第一阶段：将检索层从整篇文档检索升级为基于 `chunk` 的检索。
+项目目标是围绕当前仓库中的 AI 学习内容，逐步实现一个不依赖 `LangChain`、`LangGraph` 的实战型 Agent。当前已经完成 `v1` 的可交互 CLI 主链路，并进入 `v2`：逐步把检索层从整篇文档检索升级为 `chunk`、`vector` 和 `hybrid` 检索。
 
 ## V1 Scope
 
@@ -27,14 +27,18 @@
 
 ## V2 Phase 2
 
-当前 `v2` 第二阶段已完成以下骨架准备：
+当前 `v2` 第二阶段已完成以下升级：
 - 新增 `embedding_provider.py`，拆分 embedding provider 相关职责
 - 新增 `EmbeddingProvider` 协议与 `NotImplementedEmbeddingProvider`
 - 新增 `build_embedding_text(...)`，统一构造 embedding 输入文本
+- 新增 `HashEmbeddingProvider` 作为本地可运行的过渡实现
+- 新增 `SentenceTransformerEmbeddingProvider`，支持接入真实 embedding 模型
 - 新增 `VectorStore` 协议、`FakeVectorStore` 与 `InMemoryVectorStore`
-- `agent.py` 已支持注入 `vector_store`，为未来真实向量检索预留主流程接口
-- `RETRIEVAL_MODE=vector` 已打通到主流程，但当前仍依赖占位 provider
-- 为 vector provider / store 骨架与最小行为补充测试
+- 支持通过 `EMBEDDING_PROVIDER`、`EMBEDDING_MODEL_NAME`、`EMBEDDING_CACHE_DIR` 配置真实 embedding provider
+- `RETRIEVAL_MODE=vector` 已打通到主流程，并可结合 `sentence-transformers` 进行真实向量检索
+- 新增 `RETRIEVAL_MODE=hybrid`，支持词法检索与向量检索混合召回
+- 增加课程目录白名单和文件级白名单，进一步收紧索引语料范围
+- 为 vector provider / store 与 hybrid 检索补充测试
 
 ## 项目背景
 
@@ -56,6 +60,8 @@
 1. 课程资料扫描与读取
 - 递归扫描本地课程目录中的 Markdown 文件
 - 自动过滤 `venv`、`.venv`、`site-packages`、`__pycache__`、`.git`、`node_modules` 等无关目录
+- 支持通过课程目录白名单收紧扫描范围
+- 支持通过文件级白名单优先只索引 `notebook-summary.md` 等核心资料
 - 将读取到的课程资料统一转换为结构化 `Document`
 
 2. 文档基础结构化
@@ -84,8 +90,7 @@
 - 支持基于 `DocumentChunk` 的 chunk 级检索
 - 对同一 `source` 的检索结果增加数量限制，减少单篇文档重复占位
 - 检索结果支持携带 `chunk_id`，为后续更细粒度引用做准备
-- 支持通过配置切换 `document` / `chunk` 两种检索模式
-- 已为未来的 `vector` 检索模式预留主流程分支
+- 支持通过配置切换 `document` / `chunk` / `vector` / `hybrid` 四种检索模式
 
 5. Prompt 组装
 - 将检索结果组织成模型可读的上下文块
@@ -101,15 +106,25 @@
 - 可通过 `RETRIEVAL_MODE` 切回整篇文档检索
 - 保留整篇文档检索作为 fallback
 - `RETRIEVAL_MODE=vector` 时已支持注入 `vector_store`
+- `RETRIEVAL_MODE=hybrid` 时会合并 chunk 检索与向量检索结果
 
-7. 任务分流
+7. 向量检索链路
+- 支持通过 `build_embedding_text(...)` 统一构造 embedding 输入
+- 支持 `HashEmbeddingProvider` 作为本地快速验证用的 embedding provider
+- 支持 `SentenceTransformerEmbeddingProvider` 接入真实 embedding 模型
+- 支持通过 `EMBEDDING_CACHE_DIR` 控制模型缓存目录
+- `InMemoryVectorStore` 已支持：
+  - `index_chunks(...)`
+  - `search(...)`
+  - 基于简单点积的最小可运行向量检索
+8. 任务分流
 - 支持按问题类型区分：
   - 普通课程问答
   - 某节课 / 某个 notebook 总结
   - 学习顺序建议
 - 针对不同任务使用不同的 prompt 组织方式
 
-8. 命令行连续交互
+9. 命令行连续交互
 - 程序启动后只加载一次课程资料
 - 支持连续输入多个问题
 - 支持 `help` 查看帮助
@@ -126,7 +141,7 @@
 - 支持 `unmark_done:` 取消某个已完成主题
 - 支持通过 `exit` / `quit` / `q` 退出
 
-9. 本地用户记忆
+10. 本地用户记忆
 - 使用本地 `JSON` 文件保存用户记忆
 - 当前支持记录：
   - `learning_goal`
@@ -137,7 +152,7 @@
 - 在生成学习顺序建议时，优先参考未完成模块并尽量避开重复推荐已完成主题
 - 在生成学习顺序建议时，优先遵守用户设置的学习范围，并将范围外内容降级为补充建议
 
-10. 结构化输出
+11. 结构化输出
 - 将模型输出解析为统一的 `AgentAnswer`
 - 返回：
   - `answer`
@@ -145,7 +160,7 @@
   - `sources`
 - 当模型输出不规范时，提供兜底处理，避免程序直接崩溃
 
-11. 最小自动化测试
+12. 最小自动化测试
 - 已添加基础 pytest 测试
 - 覆盖任务分流逻辑：
   - `qa`
@@ -161,7 +176,9 @@
   - `RETRIEVAL_MODE=chunk`
   - `RETRIEVAL_MODE=document`
   - `RETRIEVAL_MODE=vector`
+  - `RETRIEVAL_MODE=hybrid`
   - 非法检索模式值被明确拒绝
+  - 非法 `EMBEDDING_PROVIDER` 值被明确拒绝
 - 覆盖 chunk 检索行为：
   - chunk 数量生成
   - 总结问题命中目标章节 chunk
@@ -175,6 +192,7 @@
   - `NotImplementedEmbeddingProvider` 明确抛出未实现异常
   - `FakeVectorStore` 可保存 chunks 并返回预设结果
   - `InMemoryVectorStore.index_chunks(...)` 会调用 embedding provider
+  - `InMemoryVectorStore.search(...)` 会返回排序后的结果
 - 覆盖切块策略行为：
   - Markdown 内容按标题边界切 section
   - chunk 优先保留 section 边界
@@ -195,6 +213,9 @@
   - `RETRIEVAL_MODE=document` 时强制走 document 检索
   - `RETRIEVAL_MODE=vector` 时如果没传 `vector_store` 会明确报错
   - `RETRIEVAL_MODE=vector` 时会优先使用 `vector_store.search(...)`
+  - `merge_retrieval_results(...)` 会按优先级合并并去重
+  - `RETRIEVAL_MODE=hybrid` 时会同时使用 chunk 检索和向量检索
+  - `RETRIEVAL_MODE=hybrid` 时如果缺少 `vector_store` 会明确报错
   - summary 场景在 chunk 路径下也会更新 completed_topics
 - 覆盖学习进度与学习路线联动：
   - 已完成模块与未完成模块划分
@@ -209,7 +230,8 @@
 ## 当前版本未完成的部分
 
 下面这些能力还没有正式完成：
-- 更正式的向量化 RAG 检索
+- 更高质量的向量索引与相似度计算
+- 更正式的 hybrid 重排策略
 - 更精细的 chunk 切分与引用控制
 - 更智能的长期记忆与学习进度利用
 - 更丰富的 CLI 交互体验（如菜单、历史记录、参数模式）
@@ -251,8 +273,8 @@ course-tutor-agent/
 当前可以直接运行 `main.py`，启动课程辅导 Agent 的交互式 CLI：
 
 ```bash
-cd /Users/a1-6/Desktop/AIAgent/05-project/course-tutor-agent/app
-python main.py
+cd /Users/a1-6/Desktop/AIAgent/05-project/course-tutor-agent
+/Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python app/main.py
 ```
 
 运行后会：

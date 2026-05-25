@@ -7,6 +7,7 @@ def make_settings(
     llm_provider: str = "github",
     api_key: str = "fake-key",
     retrieval_mode: str = "chunk",
+    embedding_provider: str = "hash",
 ) -> SimpleNamespace:
     # 用简单对象模拟 Settings，只覆盖校验所需字段
     return SimpleNamespace(
@@ -17,6 +18,7 @@ def make_settings(
         course_source_root="/tmp",
         retrieval_top_k=5,
         retrieval_mode=retrieval_mode,
+        embedding_provider=embedding_provider,
     )
 
 
@@ -41,6 +43,13 @@ def test_validate_settings_accepts_vector_retrieval_mode():
     validate_settings(settings)
 
 
+def test_validate_settings_accepts_hybrid_retrieval_mode():
+    # retrieval_mode=hybrid 应通过配置校验
+    settings = make_settings(retrieval_mode="hybrid")
+
+    validate_settings(settings)
+
+
 def test_validate_settings_rejects_invalid_retrieval_mode():
     # retrieval_mode 非法值应被明确拒绝
     settings = make_settings(retrieval_mode="invalid-mode")
@@ -50,3 +59,14 @@ def test_validate_settings_rejects_invalid_retrieval_mode():
         assert False, "validate_settings should raise ValueError for invalid retrieval_mode"
     except ValueError as exc:
         assert "RETRIEVAL_MODE" in str(exc)
+
+
+def test_validate_settings_rejects_invalid_embedding_provider():
+    # embedding_provider 非法值应被明确拒绝
+    settings = make_settings(embedding_provider="invalid-provider")
+
+    try:
+        validate_settings(settings)
+        assert False, "validate_settings should raise ValueError for invalid embedding_provider"
+    except ValueError as exc:
+        assert "EMBEDDING_PROVIDER" in str(exc)

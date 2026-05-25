@@ -26,6 +26,24 @@ def build_client(settings: Settings) -> OpenAI:
 
     return OpenAI(**client_kwargs)
 
+# 混合检索 用 retrieve_chunks(...) 取一份结果，用 vector_store.search(...) 再取一份结果，然后把两份结果合并去重，最终返回 top_k 条结果。这样做的好处是：
+# 1. retrieve_chunks(...) 的结果通常更精准，因为它直接基于文本内容进行匹配，能够捕捉到一些细粒度的相关信息；而 vector_store.search(...) 的结果可能更全面，因为它基于向量表示进行匹配。通过混合检索，我们可以兼顾精准性和全面性，提升整体的检索效果。
+# 2. retrieve_chunks(...) 的结果可以作为 vector_store.search(...) 的补充，当 retrieve_chunks(...) 没有检索到足够的相关内容时，vector_store.search(...) 可以提供更多的候选项，增加找到相关信息的机会。反过来，当 retrieve_chunks(...) 已经检索到足够的相关内容时，我们也可以通过混合检索来引入一些 vector_store.search(...) 的结果，增加多样性和覆盖面。
+def merge_retrieval_results(primary: list[RetrievedChunk], secondary: list[RetrievedChunk], top_k: int) -> list[RetrievedChunk]:
+    merged: list[RetrievedChunk] = []
+    seen: set[tuple[str, str | None]] = set()  # 用于去重，记录已经添加过的 (source, chunk_id) 组合
+
+    for item in primary + secondary:
+        key = (item.source, item.chunk_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(item)
+
+        if len(merged) >= top_k:
+            break
+    return merged
+
 def ask_course_agent(
     question: str, 
     documents: list[Document], 
@@ -37,7 +55,23 @@ def ask_course_agent(
     active_settings = settings or get_settings()
     validate_settings(active_settings)
 
-    if active_settings.retrieval_mode == "vector": # 目前向量检索还没做，所以先直接报错，等后续完善了再放开这个选项
+    if active_settings.retrieval_mode == "hybrid": # 混合检索
+        if chunks is None:
+            raise ValueError("Chunks data must be provided when RETRIEVAL_MODE=hybrid.")
+        if vector_store is None:
+            raise ValueError("Vector store must be provided when RETRIEVAL_MODE=hybrid.")
+        # 这里先让 lexical_results 放前面，是因为：标题/关键词精确命中对课程问答很重要    vector 先作为补充召回
+        lexical_results = retrieve_chunks(
+            query=question,
+            chunks=chunks,
+            top_k=active_settings.retrieval_top_k,
+        )
+        vector_results = vector_store.search(
+            query=question,
+            top_k=active_settings.retrieval_top_k,
+        )
+        retrieved_chunks = merge_retrieval_results(lexical_results, vector_results, top_k=active_settings.retrieval_top_k)
+    elif active_settings.retrieval_mode == "vector": # 目前向量检索还没做，所以先直接报错，等后续完善了再放开这个选项
         if vector_store is None:
             raise ValueError("Vector store must be provided when RETRIEVAL_MODE=vector.")
         retrieved_chunks = vector_store.search(
