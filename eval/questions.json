@@ -1,0 +1,199 @@
+[
+  {
+    "id": "qa-tool-use-001",
+    "task_type": "qa",
+    "question": "tool use 是什么？",
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "allow_cross_document": true,
+    "notes": "首条应命中 04 Tool Use，允许后续补充来自同课程组的 Agent 相关模块。"
+  },
+  {
+    "id": "qa-agentic-rag-001",
+    "task_type": "qa",
+    "question": "agentic rag 是什么？",
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "allow_cross_document": true,
+    "notes": "首条应命中 05 Agentic RAG。"
+  },
+  {
+    "id": "qa-planning-agent-001",
+    "task_type": "qa",
+    "question": "planning agent 是什么？",
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/07-planning-design/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "allow_cross_document": true,
+    "notes": "首条应命中 07 Planning Design。"
+  },
+  {
+    "id": "qa-multi-agent-001",
+    "task_type": "qa",
+    "question": "multi agent 是什么？",
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/08-multi-agent/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "allow_cross_document": true,
+    "notes": "首条应命中 08 Multi Agent。"
+  },
+  {
+    "id": "qa-metacognition-001",
+    "task_type": "qa",
+    "question": "metacognition 在 agent 里是什么意思？",
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/09-metacognition/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "allow_cross_document": true,
+    "notes": "首条应命中 09 Metacognition。"
+  },
+  {
+    "id": "qa-agent-memory-001",
+    "task_type": "qa",
+    "question": "agent memory 是什么？",
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/13-agent-memory/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "allow_cross_document": true,
+    "notes": "首条应命中 13 Agent Memory。"
+  },
+  {
+    "id": "summary-planning-001",
+    "task_type": "summary",
+    "question": "帮我总结 07-planning-design 这一节在讲什么",
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/07-planning-design/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "allow_cross_document": false,
+    "notes": "summary 应只围绕 07 Planning Design，不应混入 2-2 的 RAG 课程。"
+  },
+  {
+    "id": "summary-tool-use-001",
+    "task_type": "summary",
+    "question": "帮我总结 04-tool-use 这一节在讲什么",
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "allow_cross_document": false,
+    "notes": "summary 应收窄到 04 Tool Use 的同一文档 chunk。"
+  },
+  {
+    "id": "summary-agentic-rag-001",
+    "task_type": "summary",
+    "question": "帮我总结 05-agentic-rag 这一节在讲什么",
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "allow_cross_document": false,
+    "notes": "首条和后续来源都应集中在 05 Agentic RAG。"
+  },
+  {
+    "id": "summary-multi-agent-001",
+    "task_type": "summary",
+    "question": "帮我总结 08-multi-agent 这一节",
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/08-multi-agent/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "allow_cross_document": false,
+    "notes": "summary 应只围绕 08 Multi Agent 的 chunk。"
+  },
+  {
+    "id": "study-plan-agent-001",
+    "task_type": "study_plan",
+    "question": "如果我想继续做一个 AIAgent 项目，接下来应该按课程模块怎么学？",
+    "memory": {
+      "learning_goal": "我想做一个 AIAgent 项目",
+      "preferred_scope": "我只学习 1-* 和 2-* 的内容",
+      "completed_topics": [
+        "01 Intro To AI Agents 学习摘要"
+      ]
+    },
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/02-explore-agentic-frameworks/notebook-summary.md",
+      "2-3-ai-agents-for-beginners/03-agentic-design-patterns/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "expected_any_source_groups": [
+      "2-3-ai-agents-for-beginners"
+    ],
+    "expected_answer_contains": [
+      "02 Explore Agentic Frameworks",
+      "03 Agentic Design Patterns"
+    ],
+    "forbidden_answer_contains": [
+      "下一步先学 01 Intro",
+      "先学习 01 Intro To AI Agents"
+    ],
+    "allow_cross_document": true,
+    "notes": "这是继续学习场景，不应再把 01 Intro 长期排在第一位。"
+  },
+  {
+    "id": "study-plan-scope-001",
+    "task_type": "study_plan",
+    "question": "如果我只学 1-* 和 2-*，想做一个 AIAgent 项目，请按课程模块给我安排学习顺序。",
+    "memory": {
+      "learning_goal": "我想做一个 AIAgent 项目",
+      "preferred_scope": "我只学习 1-* 和 2-* 的内容",
+      "completed_topics": []
+    },
+    "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/01-intro-to-ai-agents/notebook-summary.md",
+      "2-3-ai-agents-for-beginners/02-explore-agentic-frameworks/notebook-summary.md"
+    ],
+    "expected_source_group": "2-3-ai-agents-for-beginners",
+    "expected_any_source_groups": [
+      "2-3-ai-agents-for-beginners"
+    ],
+    "expected_answer_contains": [
+      "01 Intro To AI Agents",
+      "02 Explore Agentic Frameworks",
+      "03 Agentic Design Patterns"
+    ],
+    "forbidden_answer_contains": [],
+    "allow_cross_document": true,
+    "notes": "这是从基础开始的学习路线问题，01 或 02 排前都合理。"
+  },
+  {
+    "id": "study-plan-rag-001",
+    "task_type": "study_plan",
+    "question": "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
+    "memory": {
+      "learning_goal": "我想重点学习 RAG，并进一步过渡到 Agentic RAG",
+      "preferred_scope": "",
+      "completed_topics": []
+    },
+    "expected_primary_source_contains": [
+      "2-1-RetrievalAugmentedGeneration",
+      "2-2-BuildingAndEvaluatingAdvancedRAGApplications",
+      "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md"
+    ],
+    "expected_source_group": "2-1-RetrievalAugmentedGeneration",
+    "expected_any_source_groups": [
+      "2-1-RetrievalAugmentedGeneration",
+      "2-2-BuildingAndEvaluatingAdvancedRAGApplications",
+      "2-3-ai-agents-for-beginners"
+    ],
+    "expected_answer_contains": [
+      "Lesson 1",
+      "Lesson 2",
+      "05 Agentic RAG"
+    ],
+    "forbidden_answer_contains": [
+      "先学习 05 Agentic RAG"
+    ],
+    "allow_cross_document": true,
+    "notes": "这是跨课程簇路线问题，不应只用首条 group 判断好坏，更重要的是是否覆盖 2-1、2-2、2-3。"
+  }
+]

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import agent
 from schemas import Document, DocumentChunk, RetrievedChunk
+from reranker import FakeReranker
 
 
 def make_document(title: str = "Test Title") -> Document:
@@ -56,6 +57,9 @@ def make_settings(retrieval_mode: str = "chunk") -> SimpleNamespace:
         embedding_model_name="BAAI/bge-m3",
         embedding_cache_dir=None,
         course_include_dirs=["2-3-ai-agents-for-beginners"],
+        reranker_provider="none",
+        reranker_model_name="BAAI/bge-reranker-base",
+        reranker_cache_dir=None,
     )
 
 
@@ -703,3 +707,168 @@ def test_ask_course_agent_overrides_model_sources_with_chunk_references(monkeypa
 
     assert result.answer == "正常回答"
     assert result.sources == ["/tmp/04-tool-use.md#04 Tool Use 学习摘要-chunk-1"]
+
+def test_ask_course_agent_uses_reranker_for_hybrid_results(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+
+    def fake_retrieve_chunks(query, chunks, top_k):
+        return [
+            RetrievedChunk(
+                source="/tmp/tool.md",
+                title="04 Tool Use 学习摘要",
+                chunk_id="tool-1",
+                snippet="lexical result",
+                score=10.0,
+                tags=["agent"],
+            )
+        ]
+
+    class FakeVectorStore:
+        def search(self, query, top_k=5):
+            return [
+                RetrievedChunk(
+                    source="/tmp/framework.md",
+                    title="02 Explore Agentic Frameworks 学习摘要",
+                    chunk_id="framework-1",
+                    snippet="vector result",
+                    score=8.5,
+                    tags=["agent"],
+                )
+            ]
+
+    monkeypatch.setattr(agent, "retrieve_chunks", fake_retrieve_chunks)
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "hybrid rerank 结果", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    reranker = FakeReranker(
+        results=[
+            RetrievedChunk(
+                source="/tmp/framework.md",
+                title="02 Explore Agentic Frameworks 学习摘要",
+                chunk_id="framework-1",
+                snippet="reranked first",
+                score=99.0,
+                tags=["agent"],
+            ),
+            RetrievedChunk(
+                source="/tmp/tool.md",
+                title="04 Tool Use 学习摘要",
+                chunk_id="tool-1",
+                snippet="reranked second",
+                score=88.0,
+                tags=["agent"],
+            ),
+        ]
+    )
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(retrieval_mode="hybrid"),
+        memory={},
+        chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+        vector_store=FakeVectorStore(),
+        reranker=reranker,
+    )
+
+    assert len(reranker.calls) == 1
+    assert result.answer == "hybrid rerank 结果"
+    assert result.sources == [
+        "/tmp/framework.md#framework-1",
+        "/tmp/tool.md#tool-1",
+    ]
+
+
+def test_post_rank_study_plan_results_prefers_default_learning_order():
+    retrieved_chunks = [
+        RetrievedChunk(
+            source="/tmp/protocols.md",
+            title="11 Agentic Protocols 学习摘要",
+            chunk_id="11-1",
+            snippet="protocols",
+            score=99.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/frameworks.md",
+            title="02 Explore Agentic Frameworks 学习摘要",
+            chunk_id="02-1",
+            snippet="frameworks",
+            score=80.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/intro.md",
+            title="01 Intro To AI Agents 学习摘要",
+            chunk_id="01-1",
+            snippet="intro",
+            score=70.0,
+            tags=["agent"],
+        ),
+    ]
+
+    ranked = agent.post_rank_study_plan_results(
+        "如果我只学 1-* 和 2-*，想做一个 AIAgent 项目，请按课程模块给我安排学习顺序。",
+        retrieved_chunks,
+    )
+
+    assert [item.title for item in ranked] == [
+        "01 Intro To AI Agents 学习摘要",
+        "02 Explore Agentic Frameworks 学习摘要",
+        "11 Agentic Protocols 学习摘要",
+    ]
+
+
+def test_post_rank_study_plan_results_prefers_rag_curriculum_for_rag_questions():
+    retrieved_chunks = [
+        RetrievedChunk(
+            source="/Users/a1-6/Desktop/AIAgent/code/2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md",
+            title="05 Agentic RAG 学习摘要",
+            chunk_id="05-1",
+            snippet="agentic rag",
+            score=100.0,
+            tags=["rag"],
+        ),
+        RetrievedChunk(
+            source="/Users/a1-6/Desktop/AIAgent/code/2-2-BuildingAndEvaluatingAdvancedRAGApplications/L2/notebook-summary.md",
+            title="Lesson 2 学习摘要",
+            chunk_id="L2-1",
+            snippet="lesson 2",
+            score=70.0,
+            tags=["rag"],
+        ),
+        RetrievedChunk(
+            source="/Users/a1-6/Desktop/AIAgent/code/2-2-BuildingAndEvaluatingAdvancedRAGApplications/L1/notebook-summary.md",
+            title="Lesson 1 学习摘要",
+            chunk_id="L1-1",
+            snippet="lesson 1",
+            score=60.0,
+            tags=["rag"],
+        ),
+    ]
+
+    ranked = agent.post_rank_study_plan_results(
+        "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
+        retrieved_chunks,
+    )
+
+    assert [item.source for item in ranked] == [
+        "/Users/a1-6/Desktop/AIAgent/code/2-2-BuildingAndEvaluatingAdvancedRAGApplications/L1/notebook-summary.md",
+        "/Users/a1-6/Desktop/AIAgent/code/2-2-BuildingAndEvaluatingAdvancedRAGApplications/L2/notebook-summary.md",
+        "/Users/a1-6/Desktop/AIAgent/code/2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md",
+    ]

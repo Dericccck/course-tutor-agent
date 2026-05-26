@@ -37,6 +37,9 @@
 - 支持通过 `EMBEDDING_PROVIDER`、`EMBEDDING_MODEL_NAME`、`EMBEDDING_CACHE_DIR` 配置真实 embedding provider
 - `RETRIEVAL_MODE=vector` 已打通到主流程，并可结合 `sentence-transformers` 进行真实向量检索
 - 新增 `RETRIEVAL_MODE=hybrid`，支持词法检索与向量检索混合召回
+- 新增 `reranker.py`，支持在 `hybrid` 结果上使用本地 CrossEncoder 做二次重排
+- 支持通过 `RERANKER_PROVIDER`、`RERANKER_MODEL_NAME`、`RERANKER_CACHE_DIR` 配置本地 reranker
+- `study_plan` 场景新增 post-rank 规则层，让学习路线服从课程教学主线
 - 增加课程目录白名单和文件级白名单，进一步收紧索引语料范围
 - 为 vector provider / store 与 hybrid 检索补充测试
 
@@ -118,14 +121,37 @@
   - `index_chunks(...)`
   - `search(...)`
   - 基于简单点积的最小可运行向量检索
-8. 任务分流
+
+8. Hybrid 重排与学习路线后排序
+- `RETRIEVAL_MODE=hybrid` 时，主流程会先执行：
+  - lexical recall
+  - vector recall
+  - merge 去重
+- 如果启用了 reranker，还会继续执行：
+  - CrossEncoder rerank
+- 对 `study_plan` 问题，还会额外执行 post-rank：
+  - 普通学习路线优先按课程主线排序
+  - `RAG -> Agentic RAG` 路线优先把 `2-2/L1`、`2-2/L2` 排到 `05 Agentic RAG` 前面
+
+9. 检索与答案评估
+- 新增 `eval/questions.json` 作为评估问题集
+- 新增 `eval/run_eval.py` 作为本地评估脚本
+- 当前评估分为两层：
+  - Retrieval Eval：看 source 命中与课程簇覆盖
+  - Agent Eval：看真实 `ask_course_agent(...)` 输出
+- 对 `study_plan` 场景，主评估指标为：
+  - `Expected Answer Hit`
+  - `Forbidden Answer Hit`
+- `Primary Hit` 在带 memory 的学习路线问题中仅作为参考，不再是主指标
+
+10. 任务分流
 - 支持按问题类型区分：
   - 普通课程问答
   - 某节课 / 某个 notebook 总结
   - 学习顺序建议
 - 针对不同任务使用不同的 prompt 组织方式
 
-9. 命令行连续交互
+11. 命令行连续交互
 - 程序启动后只加载一次课程资料
 - 支持连续输入多个问题
 - 支持 `help` 查看帮助
@@ -142,7 +168,7 @@
 - 支持 `unmark_done:` 取消某个已完成主题
 - 支持通过 `exit` / `quit` / `q` 退出
 
-10. 本地用户记忆
+12. 本地用户记忆
 - 使用本地 `JSON` 文件保存用户记忆
 - 当前支持记录：
   - `learning_goal`
@@ -153,7 +179,7 @@
 - 在生成学习顺序建议时，优先参考未完成模块并尽量避开重复推荐已完成主题
 - 在生成学习顺序建议时，优先遵守用户设置的学习范围，并将范围外内容降级为补充建议
 
-11. 结构化输出
+13. 结构化输出
 - 将模型输出解析为统一的 `AgentAnswer`
 - 返回：
   - `answer`
@@ -161,7 +187,7 @@
   - `sources`
 - 当模型输出不规范时，提供兜底处理，避免程序直接崩溃
 
-12. 最小自动化测试
+14. 最小自动化测试
 - 已添加基础 pytest 测试
 - 覆盖任务分流逻辑：
   - `qa`
@@ -217,8 +243,11 @@
   - `merge_retrieval_results(...)` 会按优先级合并并去重
   - `RETRIEVAL_MODE=hybrid` 时会同时使用 chunk 检索和向量检索
   - `RETRIEVAL_MODE=hybrid` 时如果缺少 `vector_store` 会明确报错
+  - `RETRIEVAL_MODE=hybrid` 时如果启用了 reranker，会对合并后的候选结果继续重排
   - summary 场景会收窄到首条命中的目标文档来源，避免跨文档稀释总结
   - summary 场景在 chunk 路径下也会更新 completed_topics
+  - `post_rank_study_plan_results(...)` 会对学习路线结果按课程主线做最终后排序
+  - `RAG -> Agentic RAG` 路线会优先输出 `L1 -> L2 -> 05 Agentic RAG`
 - 覆盖学习进度与学习路线联动：
   - 已完成模块与未完成模块划分
   - 学习目标 / 学习范围 / 已完成主题共同进入学习路线 prompt

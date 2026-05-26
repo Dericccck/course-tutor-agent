@@ -6,6 +6,7 @@ from loader import load_documents, load_document_chunks
 from memory import load_user_memory, save_user_memory, build_default_memory
 from embedding_provider import build_embedding_provider
 from vector_store import InMemoryVectorStore
+from reranker import build_reranker
 
 
 def print_help() -> None:
@@ -117,11 +118,19 @@ if __name__ == "__main__":
     print(f"Loaded {len(chunks)} chunks")
     
     vector_store = None
+    reranker = None
     
     if settings.retrieval_mode in {"vector", "hybrid"}:
         embedding_provider = build_embedding_provider(settings.embedding_provider, settings.embedding_model_name, settings.embedding_cache_dir) # 根据配置构建对应的 embedding provider 实例
         vector_store = InMemoryVectorStore(embedding_provider)
         vector_store.index_chunks(chunks)
+    
+    if settings.retrieval_mode == "hybrid" and settings.reranker_provider != "none":
+        reranker = build_reranker(
+            settings.reranker_provider,
+            settings.reranker_model_name,
+            settings.reranker_cache_dir,
+        )
     
     memory = load_user_memory()
 
@@ -251,7 +260,7 @@ if __name__ == "__main__":
             print("问题不能为空。\n")
             continue
 
-        result = ask_course_agent(question, documents, settings=settings, memory=memory, chunks=chunks, vector_store=vector_store,)
+        result = ask_course_agent(question, documents, settings=settings, memory=memory, chunks=chunks, vector_store=vector_store, reranker=reranker,)
 
         print(f"\nQuestion: {question}\n")
         print("Answer:")

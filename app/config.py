@@ -20,6 +20,9 @@ class Settings:
     embedding_provider: str # 如果有多个 embedding 提供商（比如 OpenAI 的 embedding API、Azure 的 embedding API、或者本地的 embedding 模型等），可以通过这个字段来区分不同的 embedding 提供商，方便我们在代码里根据配置来选择使用哪个 embedding 提供商的接口来生成向量表示。
     embedding_model_name: str # 这个字段可以用来指定生成向量表示时使用的具体模型名称。
     embedding_cache_dir: str | None # 这个字段可以用来指定一个本地目录，用于缓存生成的向量表示。这样在后续的使用中，如果同样的文本需要生成向量表示时，我们就可以直接从缓存中读取，而不需要重复调用 embedding API 来生成，节省时间和计算资源。
+    reranker_provider: str
+    reranker_model_name: str
+    reranker_cache_dir: str | None
 
 
 def get_settings() -> Settings:
@@ -36,6 +39,9 @@ def get_settings() -> Settings:
     embedding_provider = os.getenv("EMBEDDING_PROVIDER", "hash").strip().lower()
     embedding_model_name = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-m3").strip()
     embedding_cache_dir = os.getenv("EMBEDDING_CACHE_DIR", "").strip() or None
+    reranker_provider = os.getenv("RERANKER_PROVIDER", "none").strip().lower()
+    reranker_model_name = os.getenv("RERANKER_MODEL_NAME", "BAAI/bge-reranker-base").strip()
+    reranker_cache_dir = os.getenv("RERANKER_CACHE_DIR", "").strip() or embedding_cache_dir
 
     if llm_provider == "github":
         api_key = os.getenv("GITHUB_TOKEN", "").strip()
@@ -59,6 +65,9 @@ def get_settings() -> Settings:
         embedding_provider=embedding_provider,
         embedding_model_name=embedding_model_name,
         embedding_cache_dir=embedding_cache_dir,
+        reranker_provider=reranker_provider,
+        reranker_model_name=reranker_model_name,
+        reranker_cache_dir=reranker_cache_dir,
     )
 
 
@@ -75,7 +84,8 @@ def validate_settings(settings: Settings) -> None:
         raise ValueError("RETRIEVAL_MODE must be 'document', 'chunk', 'vector', or 'hybrid'.")
     
     if settings.embedding_provider not in {"hash", "sentence-transformers"}: # 目前先支持两种 embedding 提供商，后续如果需要支持更多，可以继续扩展这个条件判断。
-        raise ValueError(
-        "EMBEDDING_PROVIDER must be 'hash' or 'sentence-transformers'."
-        )
+        raise ValueError("EMBEDDING_PROVIDER must be 'hash' or 'sentence-transformers'.")
+    
+    if settings.reranker_provider not in {"none", "sentence-transformers"}: # 目前先支持两种 reranker 提供商，后续如果需要支持更多，可以继续扩展这个条件判断。
+        raise ValueError("RERANKER_PROVIDER must be 'none' or 'sentence-transformers'.")
 

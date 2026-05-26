@@ -8,6 +8,7 @@ def make_settings(
     api_key: str = "fake-key",
     retrieval_mode: str = "chunk",
     embedding_provider: str = "hash",
+    reranker_provider: str = "none",
 ) -> SimpleNamespace:
     # 用简单对象模拟 Settings，只覆盖校验所需字段
     return SimpleNamespace(
@@ -19,6 +20,7 @@ def make_settings(
         retrieval_top_k=5,
         retrieval_mode=retrieval_mode,
         embedding_provider=embedding_provider,
+        reranker_provider=reranker_provider,
     )
 
 
@@ -70,3 +72,17 @@ def test_validate_settings_rejects_invalid_embedding_provider():
         assert False, "validate_settings should raise ValueError for invalid embedding_provider"
     except ValueError as exc:
         assert "EMBEDDING_PROVIDER" in str(exc)
+
+def test_validate_settings_accepts_sentence_transformers_reranker():
+    settings = make_settings(reranker_provider="sentence-transformers")
+    validate_settings(settings)
+
+
+def test_validate_settings_rejects_invalid_reranker_provider():
+    settings = make_settings(reranker_provider="invalid-reranker")
+
+    try:
+        validate_settings(settings)
+        assert False, "validate_settings should raise ValueError for invalid reranker_provider"
+    except ValueError as exc:
+        assert "RERANKER_PROVIDER" in str(exc)

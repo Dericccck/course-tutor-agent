@@ -2,6 +2,7 @@
 # 串主流程：读取问题、调检索、组装上下文、调模型、返回结构化结果
 import json
 from vector_store import VectorStore
+from reranker import Reranker
 
 # pyrefly: ignore [missing-import]
 from openai import OpenAI
@@ -18,6 +19,15 @@ from prompts import (
 )
 from retriever import retrieve_documents, retrieve_chunks
 from schemas import AgentAnswer, Document, DocumentChunk, RetrievedChunk
+
+STUDY_PLAN_TITLE_ORDER = [
+    "01 Intro To AI Agents 学习摘要",
+    "02 Explore Agentic Frameworks 学习摘要",
+    "03 Agentic Design Patterns 学习摘要",
+    "05 Agentic RAG 学习摘要",
+    "06 Building Trustworthy Agents 学习摘要",
+    "11 Agentic Protocols 学习摘要",
+]
 
 def build_client(settings: Settings) -> OpenAI:
     client_kwargs = {"api_key": settings.api_key}
@@ -98,6 +108,7 @@ def ask_course_agent(
     memory: dict | None = None, 
     chunks: list[DocumentChunk] | None = None,
     vector_store: VectorStore | None = None,
+    reranker: Reranker | None = None,
     ) -> AgentAnswer:
     active_settings = settings or get_settings()
     validate_settings(active_settings)
@@ -119,6 +130,12 @@ def ask_course_agent(
             top_k=candidate_top_k,
         )
         retrieved_chunks = merge_retrieval_results(lexical_results, vector_results, top_k=active_settings.retrieval_top_k) # lexical 定主轴，vector 做补充
+        if reranker is not None: # 如果提供了 reranker，就对混合检索的结果进行重新排序，进一步提升相关性。这里我们把混合检索的结果作为 reranker 的输入，让它根据查询和每条结果的内容来打分排序，从而把最相关的结果排在前面，提升最终返回给用户的答案的质量和准确性。
+            retrieved_chunks = reranker.rerank(
+                question,
+                retrieved_chunks,
+                top_k=active_settings.retrieval_top_k,
+            )
     elif active_settings.retrieval_mode == "vector": # 目前向量检索还没做，所以先直接报错，等后续完善了再放开这个选项
         if vector_store is None:
             raise ValueError("Vector store must be provided when RETRIEVAL_MODE=vector.")
@@ -150,6 +167,8 @@ def ask_course_agent(
     task_type = detect_task_type(question)
     if task_type == "summary":
         retrieved_chunks = narrow_summary_results(retrieved_chunks)
+    if task_type == "study_plan":
+        retrieved_chunks = post_rank_study_plan_results(question, retrieved_chunks)
     if task_type == "summary":
         user_prompt = build_summary_prompt(question, retrieved_chunks, memory=memory)
     elif task_type == "study_plan":
@@ -239,3 +258,55 @@ def format_source_reference(chunk: RetrievedChunk) -> str:
     if chunk.chunk_id:
         return f"{chunk.source}#{chunk.chunk_id}"
     return chunk.source
+
+def is_rag_study_plan_question(question: str) -> bool:
+    """判断当前学习路线问题是否明确在问 RAG 到 Agentic RAG 的路径。"""
+    lowered = question.lower()
+    return "rag" in lowered
+
+def post_rank_study_plan_results(
+    question: str,
+    retrieved_chunks: list[RetrievedChunk],
+) -> list[RetrievedChunk]:
+    """
+    对 study_plan 场景做最终后排序。
+
+    目标：
+    1. 保留 reranker 已经召回出的候选
+    2. 但最终顺序更贴近课程学习主线
+    3. 如果是 RAG 路线问题，则优先把 2-2 的 RAG 课程排到前面
+    """
+    if not retrieved_chunks:
+        return []
+
+    title_order_map = {
+        title: index for index, title in enumerate(STUDY_PLAN_TITLE_ORDER)
+    }
+
+    def get_rag_priority(item: RetrievedChunk) -> int:
+        source = item.source
+
+        # 如果问题明确是学 RAG，再过渡到 Agentic RAG，
+        # 那就优先把 2-2 的 RAG 课程放前面，再放 05 Agentic RAG。
+        if is_rag_study_plan_question(question):
+            if "2-2-BuildingAndEvaluatingAdvancedRAGApplications/L1" in source:
+                return 0
+            if "2-2-BuildingAndEvaluatingAdvancedRAGApplications/L2" in source:
+                return 1
+            if item.title == "05 Agentic RAG 学习摘要":
+                return 2
+
+        return 999
+
+    def get_default_study_plan_priority(item: RetrievedChunk) -> int:
+        # 普通学习路线优先遵守课程主线顺序，未知标题统一放后。
+        return title_order_map.get(item.title, 999)
+
+    return sorted(
+        retrieved_chunks,
+        key=lambda item: (
+            get_rag_priority(item),
+            get_default_study_plan_priority(item),
+            -item.score,
+        ),
+    )
