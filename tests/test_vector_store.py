@@ -153,6 +153,26 @@ def test_in_memory_vector_store_indexes_chunks_with_embedding_provider():
     assert "正文二" in provider.texts[1]
 
 
+def test_in_memory_vector_store_load_index_restores_chunks_and_embeddings():
+    provider = MockEmbeddingProvider()
+    store = InMemoryVectorStore(provider)
+    chunks = [
+        DocumentChunk(
+            source="/tmp/test-1.md",
+            title="标题一",
+            chunk_id="chunk-1",
+            content="正文一",
+            tags=["agent"],
+        )
+    ]
+    embeddings = [[0.9, 0.1]]
+
+    store.load_index(chunks, embeddings)
+
+    assert store.chunks == chunks
+    assert store.embeddings == embeddings
+
+
 def test_in_memory_vector_store_search_returns_ranked_results():
     # search 应根据 query embedding 和 chunk embeddings 的分数返回排序后的结果
     provider = MockEmbeddingProvider()

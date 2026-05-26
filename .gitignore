@@ -6,4 +6,5 @@ __pycache__/
 venv/
 .pytest_cache/
 data/user_memory.json
+data/vector_index_cache.json
 .vscode/

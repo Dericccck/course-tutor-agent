@@ -40,6 +40,7 @@
 - 新增 `reranker.py`，支持在 `hybrid` 结果上使用本地 CrossEncoder 做二次重排
 - 支持通过 `RERANKER_PROVIDER`、`RERANKER_MODEL_NAME`、`RERANKER_CACHE_DIR` 配置本地 reranker
 - `study_plan` 场景新增 post-rank 规则层，让学习路线服从课程教学主线
+- 新增本地向量索引缓存，避免每次启动都重新计算全部 chunk embeddings
 - 增加课程目录白名单和文件级白名单，进一步收紧索引语料范围
 - 为 vector provider / store 与 hybrid 检索补充测试
 
@@ -117,8 +118,10 @@
 - 支持 `HashEmbeddingProvider` 作为本地快速验证用的 embedding provider
 - 支持 `SentenceTransformerEmbeddingProvider` 接入真实 embedding 模型
 - 支持通过 `EMBEDDING_CACHE_DIR` 控制模型缓存目录
+- 当前 embedding 模型与 reranker 模型都支持本地优先加载，不依赖运行时重新下载
 - `InMemoryVectorStore` 已支持：
   - `index_chunks(...)`
+  - `load_index(...)`
   - `search(...)`
   - 基于简单点积的最小可运行向量检索
 
@@ -144,14 +147,27 @@
   - `Forbidden Answer Hit`
 - `Primary Hit` 在带 memory 的学习路线问题中仅作为参考，不再是主指标
 
-10. 任务分流
+10. 向量索引持久化
+- 支持通过 `VECTOR_INDEX_CACHE_PATH` 配置本地向量索引缓存文件
+- 首次运行时：
+  - 计算全部 chunk embeddings
+  - 自动生成 `vector_index_cache.json`
+- 后续运行时：
+  - 如果 embedding 配置、课程范围和 chunk 指纹都一致，则直接从缓存恢复索引
+  - 如果任一条件变化，则自动重建并覆盖缓存
+- 当前缓存解决的是：
+  - embedding 计算与索引构建成本
+- 当前缓存不解决的是：
+  - 模型本身每次进程启动时的内存加载成本
+
+11. 任务分流
 - 支持按问题类型区分：
   - 普通课程问答
   - 某节课 / 某个 notebook 总结
   - 学习顺序建议
 - 针对不同任务使用不同的 prompt 组织方式
 
-11. 命令行连续交互
+12. 命令行连续交互
 - 程序启动后只加载一次课程资料
 - 支持连续输入多个问题
 - 支持 `help` 查看帮助
@@ -168,7 +184,7 @@
 - 支持 `unmark_done:` 取消某个已完成主题
 - 支持通过 `exit` / `quit` / `q` 退出
 
-12. 本地用户记忆
+13. 本地用户记忆
 - 使用本地 `JSON` 文件保存用户记忆
 - 当前支持记录：
   - `learning_goal`
@@ -179,7 +195,7 @@
 - 在生成学习顺序建议时，优先参考未完成模块并尽量避开重复推荐已完成主题
 - 在生成学习顺序建议时，优先遵守用户设置的学习范围，并将范围外内容降级为补充建议
 
-13. 结构化输出
+14. 结构化输出
 - 将模型输出解析为统一的 `AgentAnswer`
 - 返回：
   - `answer`
@@ -187,7 +203,7 @@
   - `sources`
 - 当模型输出不规范时，提供兜底处理，避免程序直接崩溃
 
-14. 最小自动化测试
+15. 最小自动化测试
 - 已添加基础 pytest 测试
 - 覆盖任务分流逻辑：
   - `qa`
@@ -248,6 +264,12 @@
   - summary 场景在 chunk 路径下也会更新 completed_topics
   - `post_rank_study_plan_results(...)` 会对学习路线结果按课程主线做最终后排序
   - `RAG -> Agentic RAG` 路线会优先输出 `L1 -> L2 -> 05 Agentic RAG`
+  - `InMemoryVectorStore.load_index(...)` 可直接从缓存恢复 chunks 和 embeddings
+- 覆盖向量索引缓存行为：
+  - `build_chunk_fingerprint(...)` 的稳定性
+  - chunk 内容变化时指纹变化
+  - `is_vector_index_cache_valid(...)` 的命中与失效判断
+  - 向量索引可从缓存直接恢复
 - 覆盖学习进度与学习路线联动：
   - 已完成模块与未完成模块划分
   - 学习目标 / 学习范围 / 已完成主题共同进入学习路线 prompt

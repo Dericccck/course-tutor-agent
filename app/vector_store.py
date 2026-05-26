@@ -46,6 +46,12 @@ class InMemoryVectorStore:
         self.chunks = list(chunks)
         texts = [build_embedding_text(chunk) for chunk in chunks]
         self.embeddings = self.embedding_provider.embed_texts(texts)
+
+    # 后面 main.py 命中缓存时，就不用再：vector_store.index_chunks(chunks) 了，而是直接：vector_store.load_index(chunks, embeddings)，跳过 embedding 计算的过程。这样就能显著提升启动速度，尤其是当 chunks 数量较大时。
+    def load_index(self, chunks: list[DocumentChunk], embeddings: list[list[float]]) -> None:
+        """直接从缓存恢复 chunks 和 embeddings。，跳过 embedding 计算的过程。这个方法可以用来从缓存中重建向量索引，避免每次启动都重新计算 embeddings。"""
+        self.chunks = list(chunks)
+        self.embeddings = list(embeddings)
     
     # search 方法的实现会比较复杂一些，因为需要计算查询的向量表示，然后跟所有 chunks 的向量进行相似度计算，最后返回最相关的 top_k 个结果。这里先放一个 NotImplementedError，等后续完善了再替换掉。
     def search(self, query: str, top_k: int = 5) -> list[RetrievedChunk]:

@@ -20,6 +20,7 @@ class Settings:
     embedding_provider: str # 如果有多个 embedding 提供商（比如 OpenAI 的 embedding API、Azure 的 embedding API、或者本地的 embedding 模型等），可以通过这个字段来区分不同的 embedding 提供商，方便我们在代码里根据配置来选择使用哪个 embedding 提供商的接口来生成向量表示。
     embedding_model_name: str # 这个字段可以用来指定生成向量表示时使用的具体模型名称。
     embedding_cache_dir: str | None # 这个字段可以用来指定一个本地目录，用于缓存生成的向量表示。这样在后续的使用中，如果同样的文本需要生成向量表示时，我们就可以直接从缓存中读取，而不需要重复调用 embedding API 来生成，节省时间和计算资源。
+    vector_index_cache_path: str | None # 这个字段可以用来指定一个本地文件路径，用于缓存整个向量索引的数据结构。这样在后续的使用中，我们就可以直接从这个缓存文件中加载向量索引，而不需要重新计算所有 chunks 的向量表示，进一步提升启动速度。
     reranker_provider: str
     reranker_model_name: str
     reranker_cache_dir: str | None
@@ -39,6 +40,10 @@ def get_settings() -> Settings:
     embedding_provider = os.getenv("EMBEDDING_PROVIDER", "hash").strip().lower()
     embedding_model_name = os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-m3").strip()
     embedding_cache_dir = os.getenv("EMBEDDING_CACHE_DIR", "").strip() or None
+    vector_index_cache_path = os.getenv(
+        "VECTOR_INDEX_CACHE_PATH",
+        "/Users/a1-6/Desktop/AIAgent/05-project/course-tutor-agent/data/vector_index_cache.json",
+    ).strip() or None
     reranker_provider = os.getenv("RERANKER_PROVIDER", "none").strip().lower()
     reranker_model_name = os.getenv("RERANKER_MODEL_NAME", "BAAI/bge-reranker-base").strip()
     reranker_cache_dir = os.getenv("RERANKER_CACHE_DIR", "").strip() or embedding_cache_dir
@@ -65,6 +70,7 @@ def get_settings() -> Settings:
         embedding_provider=embedding_provider,
         embedding_model_name=embedding_model_name,
         embedding_cache_dir=embedding_cache_dir,
+        vector_index_cache_path=vector_index_cache_path,
         reranker_provider=reranker_provider,
         reranker_model_name=reranker_model_name,
         reranker_cache_dir=reranker_cache_dir,

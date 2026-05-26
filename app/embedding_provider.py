@@ -69,7 +69,7 @@ class HashEmbeddingProvider:
 class SentenceTransformerEmbeddingProvider:
     def __init__(self, model_name: str, cache_folder: str | None = None):
         from sentence_transformers import SentenceTransformer
-        self.model = SentenceTransformer(model_name, cache_folder=cache_folder) # 这里我们指定了 cache_folder 来控制模型文件的缓存位置，避免每次都重新下载模型。实际使用时，可以根据需要调整这个路径。 , local_files_only=False
+        self.model = SentenceTransformer(model_name, cache_folder=cache_folder, local_files_only=True,) # 这里我们指定了 cache_folder 来控制模型文件的缓存位置，避免每次都重新下载模型。实际使用时，可以根据需要调整这个路径。 , local_files_only=False
     
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         embeddings = self.model.encode(texts, normalize_embeddings=True) # 生成文本的向量表示，并进行归一化处理，使得每个向量的长度为 1。实际使用时，这样可以方便后续的相似度计算。

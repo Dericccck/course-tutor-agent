@@ -1,11 +1,18 @@
 # main.py：跑程序
 # 程序入口。先负责接收一个问题，然后调用 agent.py 返回结果。
+from schemas import DocumentChunk
 from agent import ask_course_agent
 from config import get_settings
 from loader import load_documents, load_document_chunks
 from memory import load_user_memory, save_user_memory, build_default_memory
 from embedding_provider import build_embedding_provider
 from vector_store import InMemoryVectorStore
+from vector_index_cache import (
+    build_vector_index_payload,
+    is_vector_index_cache_valid,
+    load_vector_index_cache,
+    save_vector_index_cache,
+)
 from reranker import build_reranker
 
 
@@ -123,7 +130,29 @@ if __name__ == "__main__":
     if settings.retrieval_mode in {"vector", "hybrid"}:
         embedding_provider = build_embedding_provider(settings.embedding_provider, settings.embedding_model_name, settings.embedding_cache_dir) # 根据配置构建对应的 embedding provider 实例
         vector_store = InMemoryVectorStore(embedding_provider)
-        vector_store.index_chunks(chunks)
+        cache_loaded = False
+
+        # 尝试加载向量索引缓存，如果缓存有效就直接用缓存来恢复向量索引，跳过 embedding 计算的过程，显著提升启动速度；如果缓存无效（比如配置发生了变化，或者 chunks 内容发生了变化），就正常走向量索引构建流程，构建完成后再把新的向量索引缓存写回本地文件。
+        if settings.vector_index_cache_path:
+            cache_payload = load_vector_index_cache(settings.vector_index_cache_path)
+
+            if cache_payload and is_vector_index_cache_valid(cache_payload, settings, chunks): # 命中缓存 - 只有当缓存存在且有效时，才使用缓存来恢复向量索引。这样我们就能确保在配置或者数据发生变化时，能够正确地重建向量索引，而不是误用过期的缓存数据。
+                print("加载到有效的向量索引缓存，正在使用缓存来恢复向量索引...")
+                cached_chunks = [DocumentChunk(**item) for item in cache_payload["chunks"]]
+                cached_embeddings = cache_payload["embeddings"]
+
+                vector_store.load_index(cached_chunks, cached_embeddings) # 不再重新算 embedding，而是直接用缓存中的 chunks 和 embeddings 来恢复向量索引，这样能显著提升启动速度，尤其是当 chunks 数量较大时。
+                cache_loaded = True
+                print("向量索引已从缓存中恢复。")
+        
+        if not cache_loaded:
+            print("没有找到有效的向量索引缓存，正在构建向量索引...")
+            vector_store.index_chunks(chunks) # 自动重建
+            print("向量索引构建完成。")
+            if settings.vector_index_cache_path:
+                cache_payload = build_vector_index_payload(settings, chunks, vector_store.embeddings)
+                save_vector_index_cache(settings.vector_index_cache_path, cache_payload) # 自动覆盖缓存文件
+                print("新的向量索引缓存已保存到本地文件。")
     
     if settings.retrieval_mode == "hybrid" and settings.reranker_provider != "none":
         reranker = build_reranker(
