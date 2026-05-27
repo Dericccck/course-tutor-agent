@@ -191,6 +191,12 @@ def evaluate_sources(sample: dict, sources: list[str]) -> dict:
         "group_coverage": group_coverage,
     }
 
+def is_mode_enabled_for_sample(sample: dict, mode: str) -> bool:
+    """判断当前样本是否允许在指定mode下参与评估。"""
+    enabled_modes = sample.get("enabled_modes")
+    if not enabled_modes:
+        return True
+    return mode in enabled_modes
 
 def evaluate_sample(sample: dict, retrieved: list) -> dict:
     evaluated = evaluate_sources(
@@ -401,8 +407,12 @@ def main():
         mode_agent_results: list[dict] = []
 
         for sample in questions:
+            if not is_mode_enabled_for_sample(sample, mode):# 如果当前样本没有启用这个 mode，就跳过，不参与评估。这样我们就可以在 questions.json 中灵活地控制每个样本在哪些 mode 下参与评估，避免一些不合理的样本对某些 mode 造成干扰，同时也能更专注地分析每个 mode 的表现。
+                continue
+
             sample_memory = sample.get("memory")
 
+            print(f"\nRunning mode: {mode}")
             retrieved = retrieve_for_mode(
                 question=sample["question"],
                 mode=mode,

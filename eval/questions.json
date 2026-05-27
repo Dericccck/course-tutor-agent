@@ -112,6 +112,10 @@
   {
     "id": "study-plan-agent-001",
     "task_type": "study_plan",
+    "enabled_modes": [
+      "chunk",
+      "hybrid"
+    ],
     "question": "如果我想继续做一个 AIAgent 项目，接下来应该按课程模块怎么学？",
     "memory": {
       "learning_goal": "我想做一个 AIAgent 项目",
@@ -142,6 +146,10 @@
   {
     "id": "study-plan-scope-001",
     "task_type": "study_plan",
+    "enabled_modes": [
+      "chunk",
+      "hybrid"
+    ],
     "question": "如果我只学 1-* 和 2-*，想做一个 AIAgent 项目，请按课程模块给我安排学习顺序。",
     "memory": {
       "learning_goal": "我想做一个 AIAgent 项目",
@@ -168,6 +176,10 @@
   {
     "id": "study-plan-rag-001",
     "task_type": "study_plan",
+    "enabled_modes": [
+      "vector",
+      "hybrid"
+    ],
     "question": "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
     "memory": {
       "learning_goal": "我想重点学习 RAG，并进一步过渡到 Agentic RAG",

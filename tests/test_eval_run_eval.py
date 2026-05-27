@@ -65,3 +65,23 @@ def test_get_eval_modes_rejects_invalid_values(monkeypatch):
         assert False, "get_eval_modes should raise ValueError for invalid mode"
     except ValueError as exc:
         assert "unsupported modes" in str(exc)
+
+
+def test_is_mode_enabled_for_sample_returns_true_when_field_missing():
+    run_eval = load_run_eval_module()
+    sample = {"id": "sample-without-enabled-modes"}
+
+    assert run_eval.is_mode_enabled_for_sample(sample, "chunk") is True
+    assert run_eval.is_mode_enabled_for_sample(sample, "hybrid") is True
+
+
+def test_is_mode_enabled_for_sample_respects_enabled_modes():
+    run_eval = load_run_eval_module()
+    sample = {
+        "id": "study-plan-rag-001",
+        "enabled_modes": ["vector", "hybrid"],
+    }
+
+    assert run_eval.is_mode_enabled_for_sample(sample, "vector") is True
+    assert run_eval.is_mode_enabled_for_sample(sample, "hybrid") is True
+    assert run_eval.is_mode_enabled_for_sample(sample, "chunk") is False

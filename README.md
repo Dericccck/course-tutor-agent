@@ -152,6 +152,10 @@
 - 当前默认行为：
   - `RUN_AGENT_EVAL` 未设置时按 `false` 处理
   - `EVAL_MODES` 未设置时按 `chunk,vector,hybrid` 处理
+- `eval/questions.json` 里的单条样本还支持通过 `enabled_modes` 做模式级过滤：
+  - 未设置 `enabled_modes` 时，默认参与所有 mode 的评估
+  - 设置后，只会在指定 mode 下参与评估
+  - 例如：`"enabled_modes": ["chunk", "hybrid"]`
 - 示例：
   - `RUN_AGENT_EVAL=false /Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python eval/run_eval.py`
   - `RUN_AGENT_EVAL=true EVAL_MODES=hybrid /Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python eval/run_eval.py`
