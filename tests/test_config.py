@@ -7,6 +7,7 @@ def make_settings(
     llm_provider: str = "github",
     api_key: str = "fake-key",
     retrieval_mode: str = "chunk",
+    summary_strategy: str = "same-source",
     embedding_provider: str = "hash",
     reranker_provider: str = "none",
     hybrid_candidate_multiplier: int = 3,
@@ -23,6 +24,7 @@ def make_settings(
         hybrid_candidate_multiplier=hybrid_candidate_multiplier,
         hybrid_candidate_minimum=hybrid_candidate_minimum,
         retrieval_mode=retrieval_mode,
+        summary_strategy=summary_strategy,
         embedding_provider=embedding_provider,
         reranker_provider=reranker_provider,
     )
@@ -110,3 +112,13 @@ def test_validate_settings_rejects_invalid_hybrid_candidate_minimum():
         assert False, "validate_settings should raise ValueError for invalid hybrid_candidate_minimum"
     except ValueError as exc:
         assert "HYBRID_CANDIDATE_MINIMUM" in str(exc)
+
+
+def test_validate_settings_rejects_invalid_summary_strategy():
+    settings = make_settings(summary_strategy="invalid-summary-strategy")
+
+    try:
+        validate_settings(settings)
+        assert False, "validate_settings should raise ValueError for invalid summary_strategy"
+    except ValueError as exc:
+        assert "SUMMARY_STRATEGY" in str(exc)

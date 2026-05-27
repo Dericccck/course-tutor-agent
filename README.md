@@ -143,6 +143,10 @@
 - `default_title_order` 用于定义普通学习路线的课程主线顺序
 - `rag_route_priorities` 用于定义 `RAG -> Agentic RAG` 路线的优先级规则
 - 后续如果要调整学习顺序，不再需要改 `agent.py`，只需要改配置文件
+- `SUMMARY_STRATEGY` 用于控制 summary 场景的结果收窄策略
+- 当前仅支持：
+  - `same-source`
+  - 只保留与首条结果来自同一 source 的检索结果，降低跨文档污染
 
 9. 检索与答案评估
 - 新增 `eval/questions.json` 作为评估问题集
@@ -395,6 +399,7 @@ COURSE_SOURCE_ROOT=/Users/a1-6/Desktop/AIAgent/code
 RETRIEVAL_TOP_K=5
 HYBRID_CANDIDATE_MULTIPLIER=3
 HYBRID_CANDIDATE_MINIMUM=10
+SUMMARY_STRATEGY=same-source
 RETRIEVAL_MODE=chunk
 ```
 

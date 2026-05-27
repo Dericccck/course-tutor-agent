@@ -46,6 +46,7 @@ def make_document_chunk(title: str = "Test Chunk") -> DocumentChunk:
 
 def make_settings(
     retrieval_mode: str = "chunk",
+    summary_strategy: str = "same-source",
     hybrid_candidate_multiplier: int = 3,
     hybrid_candidate_minimum: int = 10,
 ) -> SimpleNamespace:
@@ -57,6 +58,7 @@ def make_settings(
         base_url="https://models.inference.ai.azure.com/",
         course_source_root="/tmp",
         retrieval_top_k=5,
+        summary_strategy=summary_strategy,
         hybrid_candidate_multiplier=hybrid_candidate_multiplier,
         hybrid_candidate_minimum=hybrid_candidate_minimum,
         retrieval_mode=retrieval_mode,
@@ -568,10 +570,41 @@ def test_narrow_summary_results_keeps_only_first_source():
         ),
     ]
 
-    narrowed = agent.narrow_summary_results(retrieved_chunks)
+    narrowed = agent.narrow_summary_results(
+        retrieved_chunks,
+        strategy="same-source",
+    )
 
     assert len(narrowed) == 2
     assert all(item.source == "/tmp/07-planning-design.md" for item in narrowed)
+
+
+def test_narrow_summary_results_returns_original_results_for_unknown_strategy():
+    retrieved_chunks = [
+        RetrievedChunk(
+            source="/tmp/07-planning-design.md",
+            title="07 Planning Design 学习摘要",
+            chunk_id="07-1",
+            snippet="target-1",
+            score=10.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/other.md",
+            title="Other",
+            chunk_id="other-1",
+            snippet="other",
+            score=8.0,
+            tags=["rag"],
+        ),
+    ]
+
+    narrowed = agent.narrow_summary_results(
+        retrieved_chunks,
+        strategy="unknown-strategy",
+    )
+
+    assert narrowed == retrieved_chunks
 
 
 def test_ask_course_agent_narrows_summary_results_to_target_source(monkeypatch):
