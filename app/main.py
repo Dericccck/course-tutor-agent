@@ -11,69 +11,80 @@ from vector_index_service import build_vector_store_with_cache
 
 
 def print_help() -> None:
-    print("课程辅导 Agent 支持以下能力：")
-    print("1. 普通课程问答")
-    print("2. 某节课 / 某个 notebook 总结")
-    print("3. 根据学习目标生成学习顺序建议")
+    texts = load_cli_texts_config()
+    help_texts = texts.get("help", {})
+
+    print(help_texts.get("capabilities_title", "课程辅导 Agent 支持以下能力："))
+    for line in help_texts.get("capabilities", []):
+        print(line)
     print()
-    print("可用命令：")
-    print("- 直接输入问题：开始提问")
-    print("- help：查看帮助")
-    print("- set_goal: 你的学习目标")
-    print("- set_scope: 你的学习范围")
-    print("- exit / quit / q：退出程序")
-    print("- mark_done: 标记某个主题为已完成")
-    print("- show_memory：查看当前学习记忆")
-    print("- clear_goal：清除当前学习目标")
-    print("- clear_scope：清除当前学习范围")
-    print("- unmark_done: 主题名：取消某个已完成主题")
-    print("- show_examples：查看示例问题")
-    print("- show_progress：查看当前学习进度摘要")
-    print("- clear_done：清空所有已完成主题")
-    print("- reset_memory：重置全部学习记忆")
+    print(help_texts.get("commands_title", "可用命令："))
+    for line in help_texts.get("commands", []):
+        print(line)
     print()
 
 def print_progress(memory: dict) -> None:
+    texts = load_cli_texts_config()
+    progress_texts = texts.get("progress", {})
     goal = memory.get("learning_goal", "").strip()
     scope = memory.get("preferred_scope", "").strip()
     completed_topics = memory.get("completed_topics", [])
 
-    print("\n当前学习进度摘要：")
-    print(f"- 学习目标: {goal or '未设置'}")
-    print(f"- 学习范围: {scope or '未设置'}")
+    print(f"\n{progress_texts.get('title', '当前学习进度摘要：')}")
+    print(f"- 学习目标: {goal or progress_texts.get('goal_unset', '未设置')}")
+    print(f"- 学习范围: {scope or progress_texts.get('scope_unset', '未设置')}")
     print(f"- 已完成主题数量: {len(completed_topics)}")
     print(f"- 当前学习阶段: {get_learning_stage(memory)}")
 
     if completed_topics:
-        print("- 已完成主题列表:")
+        print(f"- {progress_texts.get('completed_topics_title', '已完成主题列表:')}")
         for topic in completed_topics:
             print(f"  - {topic}")
     else:
-        print("- 已完成主题列表: 无")
+        print(
+            f"- {progress_texts.get('completed_topics_title', '已完成主题列表:')} "
+            f"{progress_texts.get('completed_topics_none', '无')}"
+        )
 
     if completed_topics:
-        print("- 当前建议: 优先继续学习尚未完成的后续模块。")
+        print(
+            f"- 当前建议: "
+            f"{progress_texts.get('suggestion_when_in_progress', '优先继续学习尚未完成的后续模块。')}"
+        )
     else:
-        print("- 当前建议: 可以先从基础模块开始建立整体框架。")
+        print(
+            f"- 当前建议: "
+            f"{progress_texts.get('suggestion_when_started', '可以先从基础模块开始建立整体框架。')}"
+        )
     
     next_topic = get_next_recommended_topic(memory)
+    next_topic_label = progress_texts.get("next_topic_label", "当前建议下一步")
     if next_topic:
-        print(f"- 当前建议下一步: {next_topic}")
+        print(f"- {next_topic_label}: {next_topic}")
     else:
-        print("- 当前建议下一步: 当前主学习路线已全部完成，可以开始复习或扩展新主题。")
+        print(
+            f"- {next_topic_label}: "
+            f"{progress_texts.get('next_topic_when_complete', '当前主学习路线已全部完成，可以开始复习或扩展新主题。')}"
+        )
 
     print()
 
 
 def print_example_questions() -> None:
-    print("示例问题：")
-    print("- tool use 是什么，和 agent 有什么关系？")
-    print("- 帮我总结 07-planning-design 这一节在讲什么")
-    print("- 如果我只学 1-* 和 2-*，想做一个 AIAgent 项目，请按课程模块给我安排学习顺序。")
+    texts = load_cli_texts_config()
+    example_texts = texts.get("examples", {})
+    print(example_texts.get("title", "示例问题："))
+    for question in example_texts.get("questions", []):
+        print(f"- {question}")
     print()
 
 def load_study_plan_order_config() -> dict:
     with STUDY_PLAN_ORDER_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_cli_texts_config() -> dict:
+    with CLI_TEXTS_PATH.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -88,6 +99,9 @@ def get_learning_stages() -> list[dict]:
 
 STUDY_PLAN_ORDER_PATH = (
     Path(__file__).resolve().parents[1] / "data" / "study_plan_order.json"
+)
+CLI_TEXTS_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "cli_texts.json"
 )
 
 def get_next_recommended_topic(memory: dict) -> str | None:

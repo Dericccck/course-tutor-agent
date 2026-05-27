@@ -7,6 +7,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_DIR = PROJECT_ROOT / "app"
+EVAL_CONFIG_PATH = PROJECT_ROOT / "eval" / "eval_config.json"
 
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
@@ -39,6 +40,11 @@ def load_questions() -> list[dict]:
     with questions_path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
+
+def load_eval_config() -> dict:
+    with EVAL_CONFIG_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
 def strip_chunk_id(source: str) -> str:
     return source.split("#", 1)[0]
 
@@ -62,12 +68,17 @@ def build_active_reranker(settings):
 
 def should_run_agent_eval() -> bool:
     """读取 RUN_AGENT_EVAL 开关，控制是否执行真实模型调用。"""
-    raw_value = os.getenv("RUN_AGENT_EVAL", "false").strip().lower()
+    config = load_eval_config()
+    default_value = str(config.get("default_run_agent_eval", False)).lower()
+    raw_value = os.getenv("RUN_AGENT_EVAL", default_value).strip().lower()
     return raw_value not in {"0", "false", "no", "off"}
 
 def get_eval_modes() -> list[str]:
     """读取 EVAL_MODES 开关， 控制本次评估运行哪些检索模式。"""
-    raw_value = os.getenv("EVAL_MODES", "chunk,vector,hybrid").strip().lower()
+    config = load_eval_config()
+    default_modes = config.get("default_modes", ["chunk", "vector", "hybrid"])
+    default_value = ",".join(default_modes)
+    raw_value = os.getenv("EVAL_MODES", default_value).strip().lower()
     modes = [item.strip() for item in raw_value.split(",") if item.strip()]
     allowed_modes = {"document", "chunk", "vector", "hybrid"}
 
@@ -83,7 +94,10 @@ def get_eval_modes() -> list[str]:
 
 def get_eval_tags() -> set[str] | None:
     """读取 EVAL_TAGS 开关，控制本次评估只运行哪些标签样本。"""
-    raw_value = os.getenv("EVAL_TAGS", "").strip().lower()
+    config = load_eval_config()
+    default_tags = config.get("default_tags", [])
+    default_value = ",".join(default_tags)
+    raw_value = os.getenv("EVAL_TAGS", default_value).strip().lower()
     if not raw_value:
         return None
 

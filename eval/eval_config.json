@@ -1,0 +1,9 @@
+{
+  "default_run_agent_eval": false,
+  "default_modes": [
+    "chunk",
+    "vector",
+    "hybrid"
+  ],
+  "default_tags": []
+}

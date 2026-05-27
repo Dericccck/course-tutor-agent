@@ -39,6 +39,65 @@ def test_print_example_questions_covers_three_core_scenarios(capsys):
     assert "如果我只学 1-* 和 2-*，想做一个 AIAgent 项目，请按课程模块给我安排学习顺序。" in output
 
 
+def test_print_help_uses_configured_texts(monkeypatch, capsys):
+    monkeypatch.setattr(
+        main,
+        "load_cli_texts_config",
+        lambda: {
+            "help": {
+                "capabilities_title": "自定义能力：",
+                "capabilities": ["能力 A"],
+                "commands_title": "自定义命令：",
+                "commands": ["- 自定义命令"],
+            }
+        },
+    )
+
+    main.print_help()
+    output = capsys.readouterr().out
+
+    assert "自定义能力：" in output
+    assert "能力 A" in output
+    assert "自定义命令：" in output
+    assert "- 自定义命令" in output
+
+
+def test_print_progress_uses_configured_messages(monkeypatch, capsys):
+    monkeypatch.setattr(
+        main,
+        "load_cli_texts_config",
+        lambda: {
+            "progress": {
+                "title": "自定义进度：",
+                "goal_unset": "未设目标",
+                "scope_unset": "未设范围",
+                "completed_topics_title": "完成列表:",
+                "completed_topics_none": "暂无",
+                "suggestion_when_started": "先打基础",
+                "suggestion_when_in_progress": "继续推进",
+                "next_topic_label": "下一步推荐",
+                "next_topic_when_complete": "已经全部完成",
+            }
+        },
+    )
+
+    memory = {
+        "learning_goal": "",
+        "preferred_scope": "",
+        "completed_topics": [],
+    }
+
+    main.print_progress(memory)
+    output = capsys.readouterr().out
+
+    assert "自定义进度：" in output
+    assert "学习目标: 未设目标" in output
+    assert "学习范围: 未设范围" in output
+    assert "完成列表: 暂无" in output
+    assert "先打基础" in output
+    assert "下一步推荐: 01 Intro To AI Agents 学习摘要" in output
+
+
 def test_print_progress_shows_empty_state(capsys):
     # 当记忆为空时，学习进度摘要应显示未设置和空列表
     memory = {

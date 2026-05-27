@@ -81,6 +81,30 @@ def test_get_eval_tags_returns_normalized_tag_set(monkeypatch):
     assert run_eval.get_eval_tags() == {"study_plan", "rag"}
 
 
+def test_should_run_agent_eval_uses_config_default(monkeypatch):
+    monkeypatch.delenv("RUN_AGENT_EVAL", raising=False)
+    run_eval = load_run_eval_module()
+    monkeypatch.setattr(
+        run_eval,
+        "load_eval_config",
+        lambda: {"default_run_agent_eval": True},
+    )
+
+    assert run_eval.should_run_agent_eval() is True
+
+
+def test_get_eval_tags_uses_config_default(monkeypatch):
+    monkeypatch.delenv("EVAL_TAGS", raising=False)
+    run_eval = load_run_eval_module()
+    monkeypatch.setattr(
+        run_eval,
+        "load_eval_config",
+        lambda: {"default_tags": ["study_plan", "rag"]},
+    )
+
+    assert run_eval.get_eval_tags() == {"study_plan", "rag"}
+
+
 def test_is_mode_enabled_for_sample_returns_true_when_field_missing():
     run_eval = load_run_eval_module()
     sample = {"id": "sample-without-enabled-modes"}

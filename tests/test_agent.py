@@ -90,6 +90,22 @@ def test_ask_course_agent_returns_fallback_when_no_retrieved_chunks(monkeypatch)
     assert result.sources == []
 
 
+def test_is_rag_study_plan_question_uses_configured_keywords(monkeypatch):
+    monkeypatch.setattr(
+        agent,
+        "load_study_plan_order_config",
+        lambda: {
+            "route_triggers": {
+                "rag_route_keywords": ["agentic rag", "检索增强生成"],
+            }
+        },
+    )
+
+    assert agent.is_rag_study_plan_question("我想重点学 Agentic RAG") is True
+    assert agent.is_rag_study_plan_question("我想重点学检索增强生成") is True
+    assert agent.is_rag_study_plan_question("我想学多 agent 协作") is False
+
+
 def test_ask_course_agent_updates_completed_topics_for_summary(monkeypatch):
     # summary 任务在命中资料时，应把第一条标题写入 completed_topics
     monkeypatch.setattr(agent, "validate_settings", lambda settings: None)

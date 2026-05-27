@@ -29,6 +29,12 @@
       "label": "深化与扩展阶段"
     }
   ],
+  "route_triggers": {
+    "rag_route_keywords": [
+      "rag",
+      "agentic rag"
+    ]
+  },
   "rag_route_priorities": [
     {
       "type": "source_contains",

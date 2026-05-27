@@ -274,7 +274,10 @@ def format_source_reference(chunk: RetrievedChunk) -> str:
 def is_rag_study_plan_question(question: str) -> bool:
     """判断当前学习路线问题是否明确在问 RAG 到 Agentic RAG 的路径。"""
     lowered = question.lower()
-    return "rag" in lowered
+    config = load_study_plan_order_config()
+    route_triggers = config.get("route_triggers", {})
+    rag_keywords = route_triggers.get("rag_route_keywords", ["rag"])
+    return any(keyword.lower() in lowered for keyword in rag_keywords)
 
 def post_rank_study_plan_results(
     question: str,

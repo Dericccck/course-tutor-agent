@@ -155,6 +155,7 @@
 - 学习路线顺序配置文件位于 `data/study_plan_order.json`
 - `default_title_order` 用于定义普通学习路线的课程主线顺序
 - `learning_stages` 用于定义 CLI 学习进度摘要中的阶段划分
+- `route_triggers.rag_route_keywords` 用于定义哪些关键词会触发 `RAG -> Agentic RAG` 路线排序
 - `rag_route_priorities` 用于定义 `RAG -> Agentic RAG` 路线的优先级规则
 - 后续如果要调整学习顺序，不再需要改 `agent.py`，只需要改配置文件
 - CLI 里的学习进度推荐与阶段判断也已复用 `default_title_order`
@@ -170,6 +171,11 @@
 - 当前评估分为两层：
   - Retrieval Eval：看 source 命中与课程簇覆盖
   - Agent Eval：看真实 `ask_course_agent(...)` 输出
+- 评估默认配置文件位于 `eval/eval_config.json`
+- 当前可配置：
+  - `default_run_agent_eval`
+  - `default_modes`
+  - `default_tags`
 - `eval/run_eval.py` 支持通过环境变量控制评估范围：
   - `RUN_AGENT_EVAL=false`
   - 只运行 Retrieval Eval，跳过真实模型调用
@@ -223,6 +229,11 @@
 
 12. 命令行连续交互
 - 程序启动后只加载一次课程资料
+- CLI 文案配置文件位于 `data/cli_texts.json`
+- 当前可配置：
+  - 帮助文本中的能力列表与命令列表
+  - 示例问题列表
+  - 学习进度摘要中的空状态文案、进行中提示文案与完成态文案
 - 支持连续输入多个问题
 - 支持 `help` 查看帮助
 - 支持 `set_goal:` 设置学习目标
