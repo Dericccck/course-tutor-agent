@@ -130,6 +130,9 @@
   - lexical recall
   - vector recall
   - merge 去重
+- `HYBRID_CANDIDATE_MULTIPLIER` 和 `HYBRID_CANDIDATE_MINIMUM` 用于控制 hybrid 模式下的候选池规模
+- 当前 `candidate_top_k` 的计算方式为：
+  - `max(RETRIEVAL_TOP_K * HYBRID_CANDIDATE_MULTIPLIER, HYBRID_CANDIDATE_MINIMUM)`
 - 如果启用了 reranker，还会继续执行：
   - CrossEncoder rerank
 - 对 `study_plan` 问题，还会额外执行 post-rank：
@@ -390,6 +393,8 @@ GITHUB_TOKEN=
 GITHUB_MODELS_BASE_URL=https://models.inference.ai.azure.com/
 COURSE_SOURCE_ROOT=/Users/a1-6/Desktop/AIAgent/code
 RETRIEVAL_TOP_K=5
+HYBRID_CANDIDATE_MULTIPLIER=3
+HYBRID_CANDIDATE_MINIMUM=10
 RETRIEVAL_MODE=chunk
 ```
 

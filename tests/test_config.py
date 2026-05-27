@@ -9,6 +9,8 @@ def make_settings(
     retrieval_mode: str = "chunk",
     embedding_provider: str = "hash",
     reranker_provider: str = "none",
+    hybrid_candidate_multiplier: int = 3,
+    hybrid_candidate_minimum: int = 10,
 ) -> SimpleNamespace:
     # 用简单对象模拟 Settings，只覆盖校验所需字段
     return SimpleNamespace(
@@ -18,6 +20,8 @@ def make_settings(
         base_url="https://models.inference.ai.azure.com/",
         course_source_root="/tmp",
         retrieval_top_k=5,
+        hybrid_candidate_multiplier=hybrid_candidate_multiplier,
+        hybrid_candidate_minimum=hybrid_candidate_minimum,
         retrieval_mode=retrieval_mode,
         embedding_provider=embedding_provider,
         reranker_provider=reranker_provider,
@@ -86,3 +90,23 @@ def test_validate_settings_rejects_invalid_reranker_provider():
         assert False, "validate_settings should raise ValueError for invalid reranker_provider"
     except ValueError as exc:
         assert "RERANKER_PROVIDER" in str(exc)
+
+
+def test_validate_settings_rejects_invalid_hybrid_candidate_multiplier():
+    settings = make_settings(hybrid_candidate_multiplier=0)
+
+    try:
+        validate_settings(settings)
+        assert False, "validate_settings should raise ValueError for invalid hybrid_candidate_multiplier"
+    except ValueError as exc:
+        assert "HYBRID_CANDIDATE_MULTIPLIER" in str(exc)
+
+
+def test_validate_settings_rejects_invalid_hybrid_candidate_minimum():
+    settings = make_settings(hybrid_candidate_minimum=0)
+
+    try:
+        validate_settings(settings)
+        assert False, "validate_settings should raise ValueError for invalid hybrid_candidate_minimum"
+    except ValueError as exc:
+        assert "HYBRID_CANDIDATE_MINIMUM" in str(exc)

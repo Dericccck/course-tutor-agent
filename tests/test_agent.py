@@ -44,7 +44,11 @@ def make_document_chunk(title: str = "Test Chunk") -> DocumentChunk:
     )
 
 
-def make_settings(retrieval_mode: str = "chunk") -> SimpleNamespace:
+def make_settings(
+    retrieval_mode: str = "chunk",
+    hybrid_candidate_multiplier: int = 3,
+    hybrid_candidate_minimum: int = 10,
+) -> SimpleNamespace:
     # 用一个简单对象模拟 Settings，避免依赖真实环境变量
     return SimpleNamespace(
         llm_provider="github",
@@ -53,6 +57,8 @@ def make_settings(retrieval_mode: str = "chunk") -> SimpleNamespace:
         base_url="https://models.inference.ai.azure.com/",
         course_source_root="/tmp",
         retrieval_top_k=5,
+        hybrid_candidate_multiplier=hybrid_candidate_multiplier,
+        hybrid_candidate_minimum=hybrid_candidate_minimum,
         retrieval_mode=retrieval_mode,
         embedding_provider="hash",
         embedding_model_name="BAAI/bge-m3",
@@ -793,6 +799,75 @@ def test_ask_course_agent_uses_reranker_for_hybrid_results(monkeypatch):
         "/tmp/framework.md#framework-1",
         "/tmp/tool.md#tool-1",
     ]
+
+
+def test_ask_course_agent_uses_configured_hybrid_candidate_pool(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+    lexical_top_ks: list[int] = []
+    vector_top_ks: list[int] = []
+
+    def fake_retrieve_chunks(query, chunks, top_k):
+        lexical_top_ks.append(top_k)
+        return [
+            RetrievedChunk(
+                source="/tmp/tool.md",
+                title="04 Tool Use 学习摘要",
+                chunk_id="tool-1",
+                snippet="lexical result",
+                score=10.0,
+                tags=["agent"],
+            )
+        ]
+
+    class FakeVectorStore:
+        def search(self, query, top_k=5):
+            vector_top_ks.append(top_k)
+            return [
+                RetrievedChunk(
+                    source="/tmp/framework.md",
+                    title="02 Explore Agentic Frameworks 学习摘要",
+                    chunk_id="framework-1",
+                    snippet="vector result",
+                    score=8.5,
+                    tags=["agent"],
+                )
+            ]
+
+    monkeypatch.setattr(agent, "retrieve_chunks", fake_retrieve_chunks)
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "hybrid 候选池结果", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(
+            retrieval_mode="hybrid",
+            hybrid_candidate_multiplier=4,
+            hybrid_candidate_minimum=12,
+        ),
+        memory={},
+        chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+        vector_store=FakeVectorStore(),
+    )
+
+    assert lexical_top_ks == [20]
+    assert vector_top_ks == [20]
+    assert result.answer == "hybrid 候选池结果"
 
 
 def test_post_rank_study_plan_results_prefers_default_learning_order():
