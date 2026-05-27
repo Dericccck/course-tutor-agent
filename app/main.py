@@ -1,5 +1,7 @@
 # main.py：跑程序
 # 程序入口。先负责接收一个问题，然后调用 agent.py 返回结果。
+import json
+from pathlib import Path
 from agent import ask_course_agent
 from config import get_settings
 from loader import load_documents, load_document_chunks
@@ -70,19 +72,23 @@ def print_example_questions() -> None:
     print("- 如果我只学 1-* 和 2-*，想做一个 AIAgent 项目，请按课程模块给我安排学习顺序。")
     print()
 
-LEARNING_SEQUENCE = [
-    "01 Intro To AI Agents 学习摘要",
-    "02 Explore Agentic Frameworks 学习摘要",
-    "03 Agentic Design Patterns 学习摘要",
-    "05 Agentic RAG 学习摘要",
-    "06 Building Trustworthy Agents 学习摘要",
-    "11 Agentic Protocols 学习摘要",
-]
+def load_study_plan_order_config() -> dict:
+    with STUDY_PLAN_ORDER_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def get_learning_sequence() -> list[str]: # 从配置文件里加载学习顺序列表，这样我们就可以在不修改代码的情况下，灵活地调整学习顺序，或者根据不同的学习目标提供不同的学习顺序。配置文件中应该包含一个 default_title_order 字段，它是一个字符串列表，表示按照什么顺序来推荐学习课程模块。我们在推荐下一步学习主题时，就会按照这个顺序来检查哪些模块已经完成了，哪些模块还没有完成，从而给出合理的下一步建议。
+    config = load_study_plan_order_config()
+    return config.get("default_title_order", [])
+
+STUDY_PLAN_ORDER_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "study_plan_order.json"
+)
 
 def get_next_recommended_topic(memory: dict) -> str | None:
     completed_topics = memory.get("completed_topics", [])
 
-    for topic in LEARNING_SEQUENCE:
+    for topic in get_learning_sequence():
         if topic not in completed_topics:
             return topic
 
@@ -90,20 +96,23 @@ def get_next_recommended_topic(memory: dict) -> str | None:
 
 def get_learning_stage(memory: dict) -> str:
     completed_topics = memory.get("completed_topics", [])
+    learning_sequence = get_learning_sequence()
 
     if not completed_topics:
         return "基础起步阶段"
 
-    if "01 Intro To AI Agents 学习摘要" in completed_topics and \
-       "02 Explore Agentic Frameworks 学习摘要" not in completed_topics:
+    completed_count = sum(
+        1 for topic in learning_sequence
+        if topic in completed_topics
+    )
+
+    if completed_count <= 1:
         return "基础理解阶段"
 
-    if "02 Explore Agentic Frameworks 学习摘要" in completed_topics and \
-       "03 Agentic Design Patterns 学习摘要" not in completed_topics:
+    if completed_count == 2:
         return "框架理解阶段"
 
-    if "03 Agentic Design Patterns 学习摘要" in completed_topics and \
-       "05 Agentic RAG 学习摘要" not in completed_topics:
+    if completed_count == 3:
         return "设计与增强阶段"
 
     return "深化与扩展阶段"

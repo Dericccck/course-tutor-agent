@@ -105,9 +105,18 @@ def test_get_next_recommended_topic_returns_none_when_all_finished():
     memory = {
         "learning_goal": "",
         "preferred_scope": "",
-        "completed_topics": list(main.LEARNING_SEQUENCE),
+        "completed_topics": list(main.get_learning_sequence()),
     }
 
     result = main.get_next_recommended_topic(memory)
 
     assert result is None
+
+
+def test_get_learning_sequence_loads_default_order_from_config():
+    # CLI 中的学习主线应直接复用 study_plan_order.json 的 default_title_order
+    sequence = main.get_learning_sequence()
+
+    assert sequence[0] == "01 Intro To AI Agents 学习摘要"
+    assert sequence[1] == "02 Explore Agentic Frameworks 学习摘要"
+    assert "05 Agentic RAG 学习摘要" in sequence
