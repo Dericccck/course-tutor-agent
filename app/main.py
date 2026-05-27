@@ -81,6 +81,11 @@ def get_learning_sequence() -> list[str]: # 从配置文件里加载学习顺序
     config = load_study_plan_order_config()
     return config.get("default_title_order", [])
 
+
+def get_learning_stages() -> list[dict]:
+    config = load_study_plan_order_config()
+    return config.get("learning_stages", [])
+
 STUDY_PLAN_ORDER_PATH = (
     Path(__file__).resolve().parents[1] / "data" / "study_plan_order.json"
 )
@@ -97,23 +102,15 @@ def get_next_recommended_topic(memory: dict) -> str | None:
 def get_learning_stage(memory: dict) -> str:
     completed_topics = memory.get("completed_topics", [])
     learning_sequence = get_learning_sequence()
-
-    if not completed_topics:
-        return "基础起步阶段"
-
     completed_count = sum(
         1 for topic in learning_sequence
         if topic in completed_topics
     )
+    learning_stages = get_learning_stages()
 
-    if completed_count <= 1:
-        return "基础理解阶段"
-
-    if completed_count == 2:
-        return "框架理解阶段"
-
-    if completed_count == 3:
-        return "设计与增强阶段"
+    for stage in learning_stages:
+        if completed_count <= stage.get("max_completed", 999):
+            return stage.get("label", "深化与扩展阶段")
 
     return "深化与扩展阶段"
 

@@ -7,6 +7,28 @@
     "06 Building Trustworthy Agents 学习摘要",
     "11 Agentic Protocols 学习摘要"
   ],
+  "learning_stages": [
+    {
+      "max_completed": 0,
+      "label": "基础起步阶段"
+    },
+    {
+      "max_completed": 1,
+      "label": "基础理解阶段"
+    },
+    {
+      "max_completed": 2,
+      "label": "框架理解阶段"
+    },
+    {
+      "max_completed": 3,
+      "label": "设计与增强阶段"
+    },
+    {
+      "max_completed": 999,
+      "label": "深化与扩展阶段"
+    }
+  ],
   "rag_route_priorities": [
     {
       "type": "source_contains",

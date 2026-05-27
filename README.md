@@ -154,10 +154,11 @@
 - `study_plan` 的后排序规则已从代码硬编码升级为配置驱动
 - 学习路线顺序配置文件位于 `data/study_plan_order.json`
 - `default_title_order` 用于定义普通学习路线的课程主线顺序
+- `learning_stages` 用于定义 CLI 学习进度摘要中的阶段划分
 - `rag_route_priorities` 用于定义 `RAG -> Agentic RAG` 路线的优先级规则
 - 后续如果要调整学习顺序，不再需要改 `agent.py`，只需要改配置文件
 - CLI 里的学习进度推荐与阶段判断也已复用 `default_title_order`
-- `show_progress`、`get_next_recommended_topic()` 和学习路线后排序现在共用同一份课程主线配置
+- `show_progress`、`get_next_recommended_topic()`、`get_learning_stage()` 和学习路线后排序现在共用同一份学习路径配置
 - `SUMMARY_STRATEGY` 用于控制 summary 场景的结果收窄策略
 - 当前仅支持：
   - `same-source`

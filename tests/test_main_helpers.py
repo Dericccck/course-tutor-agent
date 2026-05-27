@@ -120,3 +120,29 @@ def test_get_learning_sequence_loads_default_order_from_config():
     assert sequence[0] == "01 Intro To AI Agents 学习摘要"
     assert sequence[1] == "02 Explore Agentic Frameworks 学习摘要"
     assert "05 Agentic RAG 学习摘要" in sequence
+
+
+def test_get_learning_stage_uses_configured_stage_thresholds(monkeypatch):
+    # 阶段判断应直接复用配置中的 learning_stages，而不是写死在代码里
+    monkeypatch.setattr(
+        main,
+        "load_study_plan_order_config",
+        lambda: {
+            "default_title_order": [
+                "模块 A",
+                "模块 B",
+                "模块 C",
+            ],
+            "learning_stages": [
+                {"max_completed": 0, "label": "阶段 0"},
+                {"max_completed": 1, "label": "阶段 1"},
+                {"max_completed": 2, "label": "阶段 2"},
+                {"max_completed": 999, "label": "阶段 3"},
+            ],
+        },
+    )
+
+    assert main.get_learning_stage({"completed_topics": []}) == "阶段 0"
+    assert main.get_learning_stage({"completed_topics": ["模块 A"]}) == "阶段 1"
+    assert main.get_learning_stage({"completed_topics": ["模块 A", "模块 B"]}) == "阶段 2"
+    assert main.get_learning_stage({"completed_topics": ["模块 A", "模块 B", "模块 C"]}) == "阶段 3"
