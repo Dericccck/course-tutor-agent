@@ -2,6 +2,7 @@
   {
     "id": "qa-tool-use-001",
     "task_type": "qa",
+    "tags": ["qa", "agent-course", "tool-use"],
     "question": "tool use 是什么？",
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md"
@@ -13,6 +14,7 @@
   {
     "id": "qa-agentic-rag-001",
     "task_type": "qa",
+    "tags": ["qa", "agent-course", "rag"],
     "question": "agentic rag 是什么？",
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md"
@@ -24,6 +26,7 @@
   {
     "id": "qa-planning-agent-001",
     "task_type": "qa",
+    "tags": ["qa", "agent-course", "planning"],
     "question": "planning agent 是什么？",
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/07-planning-design/notebook-summary.md"
@@ -35,6 +38,7 @@
   {
     "id": "qa-multi-agent-001",
     "task_type": "qa",
+    "tags": ["qa", "agent-course", "multi-agent"],
     "question": "multi agent 是什么？",
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/08-multi-agent/notebook-summary.md"
@@ -46,6 +50,7 @@
   {
     "id": "qa-metacognition-001",
     "task_type": "qa",
+    "tags": ["qa", "agent-course", "metacognition"],
     "question": "metacognition 在 agent 里是什么意思？",
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/09-metacognition/notebook-summary.md"
@@ -57,6 +62,7 @@
   {
     "id": "qa-agent-memory-001",
     "task_type": "qa",
+    "tags": ["qa", "agent-course", "memory"],
     "question": "agent memory 是什么？",
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/13-agent-memory/notebook-summary.md"
@@ -68,6 +74,7 @@
   {
     "id": "summary-planning-001",
     "task_type": "summary",
+    "tags": ["summary", "agent-course", "planning"],
     "question": "帮我总结 07-planning-design 这一节在讲什么",
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/07-planning-design/notebook-summary.md"
@@ -79,6 +86,7 @@
   {
     "id": "summary-tool-use-001",
     "task_type": "summary",
+    "tags": ["summary", "agent-course", "tool-use"],
     "question": "帮我总结 04-tool-use 这一节在讲什么",
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md"
@@ -90,6 +98,7 @@
   {
     "id": "summary-agentic-rag-001",
     "task_type": "summary",
+    "tags": ["summary", "agent-course", "rag"],
     "question": "帮我总结 05-agentic-rag 这一节在讲什么",
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md"
@@ -101,6 +110,7 @@
   {
     "id": "summary-multi-agent-001",
     "task_type": "summary",
+    "tags": ["summary", "agent-course", "multi-agent"],
     "question": "帮我总结 08-multi-agent 这一节",
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/08-multi-agent/notebook-summary.md"
@@ -112,6 +122,7 @@
   {
     "id": "study-plan-agent-001",
     "task_type": "study_plan",
+    "tags": ["study_plan", "agent-course", "project-roadmap"],
     "enabled_modes": [
       "chunk",
       "hybrid"
@@ -146,6 +157,7 @@
   {
     "id": "study-plan-scope-001",
     "task_type": "study_plan",
+    "tags": ["study_plan", "agent-course", "scope-limited"],
     "enabled_modes": [
       "chunk",
       "hybrid"
@@ -176,6 +188,7 @@
   {
     "id": "study-plan-rag-001",
     "task_type": "study_plan",
+    "tags": ["study_plan", "rag", "cross-course"],
     "enabled_modes": [
       "vector",
       "hybrid"

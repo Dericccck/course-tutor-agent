@@ -67,6 +67,20 @@ def test_get_eval_modes_rejects_invalid_values(monkeypatch):
         assert "unsupported modes" in str(exc)
 
 
+def test_get_eval_tags_defaults_to_none(monkeypatch):
+    monkeypatch.delenv("EVAL_TAGS", raising=False)
+    run_eval = load_run_eval_module()
+
+    assert run_eval.get_eval_tags() is None
+
+
+def test_get_eval_tags_returns_normalized_tag_set(monkeypatch):
+    monkeypatch.setenv("EVAL_TAGS", "study_plan, RAG ")
+    run_eval = load_run_eval_module()
+
+    assert run_eval.get_eval_tags() == {"study_plan", "rag"}
+
+
 def test_is_mode_enabled_for_sample_returns_true_when_field_missing():
     run_eval = load_run_eval_module()
     sample = {"id": "sample-without-enabled-modes"}
@@ -85,3 +99,19 @@ def test_is_mode_enabled_for_sample_respects_enabled_modes():
     assert run_eval.is_mode_enabled_for_sample(sample, "vector") is True
     assert run_eval.is_mode_enabled_for_sample(sample, "hybrid") is True
     assert run_eval.is_mode_enabled_for_sample(sample, "chunk") is False
+
+
+def test_is_tag_enabled_for_sample_returns_true_when_filter_missing():
+    run_eval = load_run_eval_module()
+    sample = {"id": "sample-without-tag-filter", "tags": ["qa", "agent-course"]}
+
+    assert run_eval.is_tag_enabled_for_sample(sample, None) is True
+
+
+def test_is_tag_enabled_for_sample_matches_on_intersection():
+    run_eval = load_run_eval_module()
+    sample = {"id": "study-plan-rag-001", "tags": ["study_plan", "rag", "cross-course"]}
+
+    assert run_eval.is_tag_enabled_for_sample(sample, {"rag"}) is True
+    assert run_eval.is_tag_enabled_for_sample(sample, {"study_plan", "summary"}) is True
+    assert run_eval.is_tag_enabled_for_sample(sample, {"qa"}) is False

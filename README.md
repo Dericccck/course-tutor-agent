@@ -156,9 +156,18 @@
   - 未设置 `enabled_modes` 时，默认参与所有 mode 的评估
   - 设置后，只会在指定 mode 下参与评估
   - 例如：`"enabled_modes": ["chunk", "hybrid"]`
+- `eval/questions.json` 里的单条样本还支持通过 `tags` 做标签分组：
+  - 例如：`"tags": ["study_plan", "rag"]`
+  - 方便只跑某一类评估题，而不必每次都跑整套样本
+- `eval/run_eval.py` 支持通过 `EVAL_TAGS` 筛选样本标签：
+  - `EVAL_TAGS=study_plan`
+  - 只跑带 `study_plan` 标签的样本
+  - `EVAL_TAGS=rag,study_plan`
+  - 只跑同时命中 `rag` 或 `study_plan` 标签的样本集合
 - 示例：
   - `RUN_AGENT_EVAL=false /Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python eval/run_eval.py`
   - `RUN_AGENT_EVAL=true EVAL_MODES=hybrid /Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python eval/run_eval.py`
+  - `RUN_AGENT_EVAL=true EVAL_MODES=hybrid EVAL_TAGS=study_plan /Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python eval/run_eval.py`
 - 对 `study_plan` 场景，主评估指标为：
   - `Expected Answer Hit`
   - `Forbidden Answer Hit`

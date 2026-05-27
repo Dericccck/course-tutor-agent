@@ -81,6 +81,16 @@ def get_eval_modes() -> list[str]:
     return modes
 
 
+def get_eval_tags() -> set[str] | None:
+    """读取 EVAL_TAGS 开关，控制本次评估只运行哪些标签样本。"""
+    raw_value = os.getenv("EVAL_TAGS", "").strip().lower()
+    if not raw_value:
+        return None
+
+    tags = {item.strip() for item in raw_value.split(",") if item.strip()}
+    return tags or None
+
+
 def retrieve_for_mode(
     question: str,
     mode: str,
@@ -197,6 +207,15 @@ def is_mode_enabled_for_sample(sample: dict, mode: str) -> bool:
     if not enabled_modes:
         return True
     return mode in enabled_modes
+
+
+def is_tag_enabled_for_sample(sample: dict, active_tags: set[str] | None) -> bool:
+    """判断当前样本是否命中本次评估要求的标签。"""
+    if active_tags is None:
+        return True
+
+    sample_tags = {item.strip().lower() for item in sample.get("tags", []) if item.strip()}
+    return bool(sample_tags & active_tags)
 
 def evaluate_sample(sample: dict, retrieved: list) -> dict:
     evaluated = evaluate_sources(
@@ -372,6 +391,7 @@ def main():
     settings = get_settings()
     run_agent_eval = should_run_agent_eval()
     modes = get_eval_modes()
+    active_tags = get_eval_tags()
     questions = load_questions()
     documents = load_documents(
         settings.course_source_root,
@@ -386,6 +406,7 @@ def main():
     print(f"Loaded {len(chunks)} chunks")
     print(f"Loaded {len(questions)} eval questions")
     print(f"EVAL_MODES={','.join(modes)}")
+    print(f"EVAL_TAGS={','.join(sorted(active_tags)) if active_tags else 'all'}")
     print(f"RUN_AGENT_EVAL={run_agent_eval}")
 
     modes = get_eval_modes()
@@ -407,6 +428,9 @@ def main():
         mode_agent_results: list[dict] = []
 
         for sample in questions:
+            if not is_tag_enabled_for_sample(sample, active_tags):
+                continue
+
             if not is_mode_enabled_for_sample(sample, mode):# 如果当前样本没有启用这个 mode，就跳过，不参与评估。这样我们就可以在 questions.json 中灵活地控制每个样本在哪些 mode 下参与评估，避免一些不合理的样本对某些 mode 造成干扰，同时也能更专注地分析每个 mode 的表现。
                 continue
 
