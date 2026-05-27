@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -58,6 +59,26 @@ def build_active_reranker(settings):
         settings.reranker_model_name,
         settings.reranker_cache_dir,
     )
+
+def should_run_agent_eval() -> bool:
+    """读取 RUN_AGENT_EVAL 开关，控制是否执行真实模型调用。"""
+    raw_value = os.getenv("RUN_AGENT_EVAL", "false").strip().lower()
+    return raw_value not in {"0", "false", "no", "off"}
+
+def get_eval_modes() -> list[str]:
+    """读取 EVAL_MODES 开关， 控制本次评估运行哪些检索模式。"""
+    raw_value = os.getenv("EVAL_MODES", "chunk,vector,hybrid").strip().lower()
+    modes = [item.strip() for item in raw_value.split(",") if item.strip()]
+    allowed_modes = {"document", "chunk", "vector", "hybrid"}
+
+    if not modes:
+        raise ValueError("EVAL_MODES must contain at least one mode.")
+    
+    invalid_modes = [mode for mode in modes if mode not in allowed_modes]
+    if invalid_modes:
+        raise ValueError("EVAL_MODES contains unsupported modes: " + ", ".join(invalid_modes))
+    
+    return modes
 
 
 def retrieve_for_mode(
@@ -343,6 +364,8 @@ def print_agent_detailed_results(mode: str, results: list[dict]) -> None:
 
 def main():
     settings = get_settings()
+    run_agent_eval = should_run_agent_eval()
+    modes = get_eval_modes()
     questions = load_questions()
     documents = load_documents(
         settings.course_source_root,
@@ -356,8 +379,10 @@ def main():
     print(f"Loaded {len(documents)} documents")
     print(f"Loaded {len(chunks)} chunks")
     print(f"Loaded {len(questions)} eval questions")
+    print(f"EVAL_MODES={','.join(modes)}")
+    print(f"RUN_AGENT_EVAL={run_agent_eval}")
 
-    modes = ["chunk", "vector", "hybrid"]
+    modes = get_eval_modes()
     all_results: dict[str, list[dict]] = {}
     all_agent_results: dict[str, list[dict]] = {}
 
@@ -391,7 +416,7 @@ def main():
             evaluated = evaluate_sample(sample, retrieved)
             mode_results.append(evaluated)
 
-            if sample["task_type"] == "study_plan":
+            if run_agent_eval and sample["task_type"] == "study_plan":
                 answer_result = ask_course_agent(
                     question=sample["question"],
                     documents=documents,

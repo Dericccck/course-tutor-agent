@@ -1,0 +1,67 @@
+import importlib.util
+from pathlib import Path
+
+
+RUN_EVAL_PATH = (
+    Path(__file__).resolve().parents[1] / "eval" / "run_eval.py"
+)
+
+
+def load_run_eval_module():
+    spec = importlib.util.spec_from_file_location(
+        "eval_run_eval",
+        RUN_EVAL_PATH,
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec is not None
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_should_run_agent_eval_defaults_to_false(monkeypatch):
+    monkeypatch.delenv("RUN_AGENT_EVAL", raising=False)
+    run_eval = load_run_eval_module()
+
+    assert run_eval.should_run_agent_eval() is False
+
+
+def test_should_run_agent_eval_returns_false_for_disabled_values(monkeypatch):
+    run_eval = load_run_eval_module()
+
+    for value in ["false", "0", "off", "no"]:
+        monkeypatch.setenv("RUN_AGENT_EVAL", value)
+        assert run_eval.should_run_agent_eval() is False
+
+
+def test_should_run_agent_eval_returns_true_for_enabled_values(monkeypatch):
+    run_eval = load_run_eval_module()
+
+    for value in ["true", "1", "yes", "on"]:
+        monkeypatch.setenv("RUN_AGENT_EVAL", value)
+        assert run_eval.should_run_agent_eval() is True
+
+
+def test_get_eval_modes_defaults_to_chunk_vector_hybrid(monkeypatch):
+    monkeypatch.delenv("EVAL_MODES", raising=False)
+    run_eval = load_run_eval_module()
+
+    assert run_eval.get_eval_modes() == ["chunk", "vector", "hybrid"]
+
+
+def test_get_eval_modes_supports_subset(monkeypatch):
+    monkeypatch.setenv("EVAL_MODES", "chunk,hybrid")
+    run_eval = load_run_eval_module()
+
+    assert run_eval.get_eval_modes() == ["chunk", "hybrid"]
+
+
+def test_get_eval_modes_rejects_invalid_values(monkeypatch):
+    monkeypatch.setenv("EVAL_MODES", "chunk,invalid-mode")
+    run_eval = load_run_eval_module()
+
+    try:
+        run_eval.get_eval_modes()
+        assert False, "get_eval_modes should raise ValueError for invalid mode"
+    except ValueError as exc:
+        assert "unsupported modes" in str(exc)

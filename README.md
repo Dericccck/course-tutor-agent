@@ -142,6 +142,19 @@
 - 当前评估分为两层：
   - Retrieval Eval：看 source 命中与课程簇覆盖
   - Agent Eval：看真实 `ask_course_agent(...)` 输出
+- `eval/run_eval.py` 支持通过环境变量控制评估范围：
+  - `RUN_AGENT_EVAL=false`
+  - 只运行 Retrieval Eval，跳过真实模型调用
+  - `RUN_AGENT_EVAL=true`
+  - 同时运行 Retrieval Eval 和 Agent Eval
+  - `EVAL_MODES=chunk,vector,hybrid`
+  - 控制本次评估运行哪些检索模式，也可以只跑 `hybrid` 或 `chunk,hybrid`
+- 当前默认行为：
+  - `RUN_AGENT_EVAL` 未设置时按 `false` 处理
+  - `EVAL_MODES` 未设置时按 `chunk,vector,hybrid` 处理
+- 示例：
+  - `RUN_AGENT_EVAL=false /Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python eval/run_eval.py`
+  - `RUN_AGENT_EVAL=true EVAL_MODES=hybrid /Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python eval/run_eval.py`
 - 对 `study_plan` 场景，主评估指标为：
   - `Expected Answer Hit`
   - `Forbidden Answer Hit`
