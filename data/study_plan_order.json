@@ -1,0 +1,24 @@
+{
+  "default_title_order": [
+    "01 Intro To AI Agents 学习摘要",
+    "02 Explore Agentic Frameworks 学习摘要",
+    "03 Agentic Design Patterns 学习摘要",
+    "05 Agentic RAG 学习摘要",
+    "06 Building Trustworthy Agents 学习摘要",
+    "11 Agentic Protocols 学习摘要"
+  ],
+  "rag_route_priorities": [
+    {
+      "type": "source_contains",
+      "value": "2-2-BuildingAndEvaluatingAdvancedRAGApplications/L1"
+    },
+    {
+      "type": "source_contains",
+      "value": "2-2-BuildingAndEvaluatingAdvancedRAGApplications/L2"
+    },
+    {
+      "type": "title_equals",
+      "value": "05 Agentic RAG 学习摘要"
+    }
+  ]
+}

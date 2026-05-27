@@ -3,6 +3,7 @@
 # 2. summary 任务应自动更新 completed_topics
 # 3. 模型返回非法 JSON 时，应走 fallback 而不是报错
 
+import json
 from types import SimpleNamespace
 
 import agent
@@ -871,4 +872,76 @@ def test_post_rank_study_plan_results_prefers_rag_curriculum_for_rag_questions()
         "/Users/a1-6/Desktop/AIAgent/code/2-2-BuildingAndEvaluatingAdvancedRAGApplications/L1/notebook-summary.md",
         "/Users/a1-6/Desktop/AIAgent/code/2-2-BuildingAndEvaluatingAdvancedRAGApplications/L2/notebook-summary.md",
         "/Users/a1-6/Desktop/AIAgent/code/2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md",
+    ]
+
+
+def test_load_study_plan_order_config_reads_json_file(monkeypatch, tmp_path):
+    config_path = tmp_path / "study_plan_order.json"
+    config_payload = {
+        "default_title_order": ["B", "A"],
+        "rag_route_priorities": [
+            {"type": "source_contains", "value": "L1"},
+        ],
+    }
+    config_path.write_text(
+        json.dumps(config_payload, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(agent, "STUDY_PLAN_ORDER_PATH", config_path)
+
+    loaded = agent.load_study_plan_order_config()
+
+    assert loaded == config_payload
+
+
+def test_post_rank_study_plan_results_uses_loaded_config(monkeypatch):
+    monkeypatch.setattr(
+        agent,
+        "load_study_plan_order_config",
+        lambda: {
+            "default_title_order": [
+                "11 Agentic Protocols 学习摘要",
+                "02 Explore Agentic Frameworks 学习摘要",
+                "01 Intro To AI Agents 学习摘要",
+            ],
+            "rag_route_priorities": [],
+        },
+    )
+
+    retrieved_chunks = [
+        RetrievedChunk(
+            source="/tmp/intro.md",
+            title="01 Intro To AI Agents 学习摘要",
+            chunk_id="01-1",
+            snippet="intro",
+            score=90.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/frameworks.md",
+            title="02 Explore Agentic Frameworks 学习摘要",
+            chunk_id="02-1",
+            snippet="frameworks",
+            score=80.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/protocols.md",
+            title="11 Agentic Protocols 学习摘要",
+            chunk_id="11-1",
+            snippet="protocols",
+            score=70.0,
+            tags=["agent"],
+        ),
+    ]
+
+    ranked = agent.post_rank_study_plan_results(
+        "如果我只学 1-* 和 2-*，想做一个 AIAgent 项目，请按课程模块给我安排学习顺序。",
+        retrieved_chunks,
+    )
+
+    assert [item.title for item in ranked] == [
+        "11 Agentic Protocols 学习摘要",
+        "02 Explore Agentic Frameworks 学习摘要",
+        "01 Intro To AI Agents 学习摘要",
     ]

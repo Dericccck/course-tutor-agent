@@ -20,14 +20,9 @@ from prompts import (
 from retriever import retrieve_documents, retrieve_chunks
 from schemas import AgentAnswer, Document, DocumentChunk, RetrievedChunk
 
-STUDY_PLAN_TITLE_ORDER = [
-    "01 Intro To AI Agents 学习摘要",
-    "02 Explore Agentic Frameworks 学习摘要",
-    "03 Agentic Design Patterns 学习摘要",
-    "05 Agentic RAG 学习摘要",
-    "06 Building Trustworthy Agents 学习摘要",
-    "11 Agentic Protocols 学习摘要",
-]
+STUDY_PLAN_ORDER_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "study_plan_order.json"
+)
 
 def build_client(settings: Settings) -> OpenAI:
     client_kwargs = {"api_key": settings.api_key}
@@ -36,6 +31,11 @@ def build_client(settings: Settings) -> OpenAI:
         client_kwargs["base_url"] = settings.base_url
 
     return OpenAI(**client_kwargs)
+
+def load_study_plan_order_config() -> dict:
+    """读取 study_plan 排序配置。"""
+    with STUDY_PLAN_ORDER_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 # 这个函数的作用是从给定的 source 路径中提取课程组信息。我们假设课程组的信息包含在路径的某个部分，并且以 "1-" 或 "2-" 开头。通过这个函数，我们可以在后续的检索结果排序中优先展示与用户问题相关的课程组内容，从而提升用户体验和检索结果的相关性。
 def get_course_group(source: str) -> str | None:
@@ -279,22 +279,27 @@ def post_rank_study_plan_results(
     if not retrieved_chunks:
         return []
 
+    config = load_study_plan_order_config()
+    default_title_order = config.get("default_title_order", [])
+    rag_route_priorities = config.get("rag_route_priorities", [])
+
     title_order_map = {
-        title: index for index, title in enumerate(STUDY_PLAN_TITLE_ORDER)
+        title: index for index, title in enumerate(default_title_order)
     }
 
     def get_rag_priority(item: RetrievedChunk) -> int:
         source = item.source
 
-        # 如果问题明确是学 RAG，再过渡到 Agentic RAG，
-        # 那就优先把 2-2 的 RAG 课程放前面，再放 05 Agentic RAG。
-        if is_rag_study_plan_question(question):
-            if "2-2-BuildingAndEvaluatingAdvancedRAGApplications/L1" in source:
-                return 0
-            if "2-2-BuildingAndEvaluatingAdvancedRAGApplications/L2" in source:
-                return 1
-            if item.title == "05 Agentic RAG 学习摘要":
-                return 2
+        if is_rag_study_plan_question(question):# 如果问题里明确提到了 RAG，那我们就按照配置里针对 RAG 路线的优先级来排序，把 2-2 的 RAG 课程放在更前面，确保满足用户的查询意图。
+            for index, rule in enumerate(rag_route_priorities):
+                rule_type = rule.get("type")
+                rule_value = rule.get("value", "")
+
+                if rule_type == "source_contains" and rule_value in item.source:
+                    return index
+
+                if rule_type == "title_equals" and item.title == rule_value:
+                    return index
 
         return 999
 

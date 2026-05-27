@@ -135,6 +135,11 @@
 - 对 `study_plan` 问题，还会额外执行 post-rank：
   - 普通学习路线优先按课程主线排序
   - `RAG -> Agentic RAG` 路线优先把 `2-2/L1`、`2-2/L2` 排到 `05 Agentic RAG` 前面
+- `study_plan` 的后排序规则已从代码硬编码升级为配置驱动
+- 学习路线顺序配置文件位于 `data/study_plan_order.json`
+- `default_title_order` 用于定义普通学习路线的课程主线顺序
+- `rag_route_priorities` 用于定义 `RAG -> Agentic RAG` 路线的优先级规则
+- 后续如果要调整学习顺序，不再需要改 `agent.py`，只需要改配置文件
 
 9. 检索与答案评估
 - 新增 `eval/questions.json` 作为评估问题集
