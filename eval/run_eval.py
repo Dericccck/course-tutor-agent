@@ -17,11 +17,10 @@ from agent import (
     narrow_summary_results,
 )
 from config import get_settings
-from embedding_provider import build_embedding_provider
 from loader import load_document_chunks, load_documents
 from retriever import retrieve_chunks, retrieve_documents
-from vector_store import InMemoryVectorStore
 from reranker import build_reranker
+from vector_index_service import build_vector_store_with_cache
 
 #   {
 #     "id": "qa-tool-use-001", //id唯一标识，后面跑评估脚本时很好用
@@ -59,16 +58,6 @@ def build_active_reranker(settings):
         settings.reranker_model_name,
         settings.reranker_cache_dir,
     )
-
-def build_vector_store(settings, chunks):
-    embedding_provider = build_embedding_provider(
-        settings.embedding_provider,
-        settings.embedding_model_name,
-        settings.embedding_cache_dir,
-    )
-    vector_store = InMemoryVectorStore(embedding_provider)
-    vector_store.index_chunks(chunks)
-    return vector_store
 
 
 def retrieve_for_mode(
@@ -376,7 +365,7 @@ def main():
     reranker = None
 
     if "vector" in modes or "hybrid" in modes:
-        vector_store = build_vector_store(settings, chunks)
+        vector_store = build_vector_store_with_cache(settings, chunks)
 
     if "hybrid" in modes:
         reranker = build_active_reranker(settings)
