@@ -46,16 +46,22 @@ def get_course_group(source: str) -> str | None:
     return None
 
 # 这个函数的作用是对检索到的结果进行过滤和排序，优先保留与首条结果来自同一课程组的内容。这样做的好处是可以提升检索结果的相关性和一致性，尤其是在用户提问中包含了特定课程组信息的情况下。通过这种方式，我们可以更好地满足用户的查询意图，提供更精准和有针对性的回答。
-def narrow_summary_results(retrieved_chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
+def narrow_summary_results(
+    retrieved_chunks: list[RetrievedChunk],
+    strategy: str = "same-source",
+) -> list[RetrievedChunk]:
     if not retrieved_chunks:
         return []
 
-    target_source = retrieved_chunks[0].source
-    same_source = [
-        item for item in retrieved_chunks
-        if item.source == target_source
-    ]
-    return same_source or retrieved_chunks
+    if strategy == "same-source":
+        target_source = retrieved_chunks[0].source
+        same_source = [
+            item for item in retrieved_chunks
+            if item.source == target_source
+        ]
+        return same_source or retrieved_chunks
+
+    return retrieved_chunks
 
 # 混合检索 用 retrieve_chunks(...) 取一份结果，用 vector_store.search(...) 再取一份结果，然后把两份结果合并去重，最终返回 top_k 条结果。这样做的好处是：
 # 1. retrieve_chunks(...) 的结果通常更精准，因为它直接基于文本内容进行匹配，能够捕捉到一些细粒度的相关信息；而 vector_store.search(...) 的结果可能更全面，因为它基于向量表示进行匹配。通过混合检索，我们可以兼顾精准性和全面性，提升整体的检索效果。
@@ -113,12 +119,15 @@ def ask_course_agent(
     active_settings = settings or get_settings()
     validate_settings(active_settings)
 
-    if active_settings.retrieval_mode == "hybrid": # 混合检索
+    if active_settings.retrieval.retrieval_mode == "hybrid": # 混合检索
         if chunks is None:
             raise ValueError("Chunks data must be provided when RETRIEVAL_MODE=hybrid.")
         if vector_store is None:
             raise ValueError("Vector store must be provided when RETRIEVAL_MODE=hybrid.")
-        candidate_top_k = max(active_settings.retrieval_top_k * 3, 10)
+        candidate_top_k = max(
+            active_settings.retrieval.retrieval_top_k * active_settings.retrieval.hybrid_candidate_multiplier,
+            active_settings.retrieval.hybrid_candidate_minimum,
+        )
         # 这里先让 lexical_results 放前面，是因为：标题/关键词精确命中对课程问答很重要    vector 先作为补充召回
         lexical_results = retrieve_chunks(
             query=question,
@@ -129,31 +138,31 @@ def ask_course_agent(
             query=question,
             top_k=candidate_top_k,
         )
-        retrieved_chunks = merge_retrieval_results(lexical_results, vector_results, top_k=active_settings.retrieval_top_k) # lexical 定主轴，vector 做补充
+        retrieved_chunks = merge_retrieval_results(lexical_results, vector_results, top_k=active_settings.retrieval.retrieval_top_k) # lexical 定主轴，vector 做补充
         if reranker is not None: # 如果提供了 reranker，就对混合检索的结果进行重新排序，进一步提升相关性。这里我们把混合检索的结果作为 reranker 的输入，让它根据查询和每条结果的内容来打分排序，从而把最相关的结果排在前面，提升最终返回给用户的答案的质量和准确性。
             retrieved_chunks = reranker.rerank(
                 question,
                 retrieved_chunks,
-                top_k=active_settings.retrieval_top_k,
+                top_k=active_settings.retrieval.retrieval_top_k,
             )
-    elif active_settings.retrieval_mode == "vector": # 目前向量检索还没做，所以先直接报错，等后续完善了再放开这个选项
+    elif active_settings.retrieval.retrieval_mode == "vector": # 目前向量检索还没做，所以先直接报错，等后续完善了再放开这个选项
         if vector_store is None:
             raise ValueError("Vector store must be provided when RETRIEVAL_MODE=vector.")
         retrieved_chunks = vector_store.search(
             query=question, 
-            top_k=active_settings.retrieval_top_k,
+            top_k=active_settings.retrieval.retrieval_top_k,
         )
-    elif active_settings.retrieval_mode == "chunk" and chunks is not None: # 优先使用切分后的 chunk 进行检索，只有在没有提供 chunks 或者 retrieval_mode 设置为 document 时才退回到文档级检索
+    elif active_settings.retrieval.retrieval_mode == "chunk" and chunks is not None: # 优先使用切分后的 chunk 进行检索，只有在没有提供 chunks 或者 retrieval_mode 设置为 document 时才退回到文档级检索
         retrieved_chunks = retrieve_chunks(
             query=question,
             chunks=chunks,
-            top_k=active_settings.retrieval_top_k,
+            top_k=active_settings.retrieval.retrieval_top_k,
         )
     else: # 否则就退回到最原始的文档级检索（虽然效率更低，但至少能工作）
         retrieved_chunks = retrieve_documents(
             query=question,
             documents=documents,
-            top_k=active_settings.retrieval_top_k,
+            top_k=active_settings.retrieval.retrieval_top_k,
         )
 
     if not retrieved_chunks:
@@ -166,7 +175,10 @@ def ask_course_agent(
     client = build_client(active_settings)
     task_type = detect_task_type(question)
     if task_type == "summary":
-        retrieved_chunks = narrow_summary_results(retrieved_chunks)
+        retrieved_chunks = narrow_summary_results(
+            retrieved_chunks,
+            strategy=active_settings.retrieval.summary_strategy,
+        )
     if task_type == "study_plan":
         retrieved_chunks = post_rank_study_plan_results(question, retrieved_chunks)
     if task_type == "summary":

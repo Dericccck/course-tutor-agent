@@ -27,10 +27,12 @@ def make_settings(
     vector_index_cache_path: str | None = "/tmp/vector-index-cache.json",
 ) -> SimpleNamespace:
     return SimpleNamespace(
-        embedding_provider=embedding_provider,
-        embedding_model_name=embedding_model_name,
-        embedding_cache_dir=embedding_cache_dir,
         vector_index_cache_path=vector_index_cache_path,
+        retrieval=SimpleNamespace(
+            embedding_provider=embedding_provider,
+            embedding_model_name=embedding_model_name,
+            embedding_cache_dir=embedding_cache_dir,
+        ),
     )
 
 

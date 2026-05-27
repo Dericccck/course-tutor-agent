@@ -57,8 +57,8 @@ def build_vector_index_payload(settings, chunks: list[DocumentChunk], embeddings
     """构造可落盘的向量索引缓存结构。"""
     return {
         "version": 1,
-        "embedding_provider": settings.embedding_provider,
-        "embedding_model_name": settings.embedding_model_name,
+        "embedding_provider": settings.retrieval.embedding_provider,
+        "embedding_model_name": settings.retrieval.embedding_model_name,
         "course_source_root": settings.course_source_root,
         "course_include_dirs": settings.course_include_dirs,
         "chunks_fingerprint": build_chunk_fingerprint(chunks), # 通过 chunks 的指纹来判断缓存是否失效，如果指纹不匹配，就说明 chunks 内容发生了变化，需要重新计算 embeddings 并更新缓存。
@@ -90,9 +90,9 @@ def is_vector_index_cache_valid(payload: dict, settings, chunks: list[DocumentCh
     """判断缓存是否仍然有效 - 通过比较缓存中的配置和当前的配置，以及 chunks 的指纹来判断。如果任何一个关键配置项发生了变化，或者 chunks 内容发生了变化，就说明缓存失效，需要重新计算 embeddings 并更新缓存。"""
     if payload.get("version") != 1:
         return False
-    if payload.get("embedding_provider") != settings.embedding_provider:
+    if payload.get("embedding_provider") != settings.retrieval.embedding_provider:
         return False
-    if payload.get("embedding_model_name") != settings.embedding_model_name:
+    if payload.get("embedding_model_name") != settings.retrieval.embedding_model_name:
         return False
     if payload.get("course_source_root") != settings.course_source_root:
         return False

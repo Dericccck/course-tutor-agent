@@ -130,6 +130,19 @@
   - lexical recall
   - vector recall
   - merge 去重
+- 检索相关配置已经在代码层收口为 `RetrievalSettings`
+- 当前会统一通过 `settings.retrieval.xxx` 读取以下配置：
+  - `retrieval_top_k`
+  - `retrieval_mode`
+  - `summary_strategy`
+  - `hybrid_candidate_multiplier`
+  - `hybrid_candidate_minimum`
+  - `embedding_provider`
+  - `embedding_model_name`
+  - `embedding_cache_dir`
+  - `reranker_provider`
+  - `reranker_model_name`
+  - `reranker_cache_dir`
 - `HYBRID_CANDIDATE_MULTIPLIER` 和 `HYBRID_CANDIDATE_MINIMUM` 用于控制 hybrid 模式下的候选池规模
 - 当前 `candidate_top_k` 的计算方式为：
   - `max(RETRIEVAL_TOP_K * HYBRID_CANDIDATE_MULTIPLIER, HYBRID_CANDIDATE_MINIMUM)`

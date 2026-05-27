@@ -20,13 +20,15 @@ def make_settings(
         api_key=api_key,
         base_url="https://models.inference.ai.azure.com/",
         course_source_root="/tmp",
-        retrieval_top_k=5,
-        hybrid_candidate_multiplier=hybrid_candidate_multiplier,
-        hybrid_candidate_minimum=hybrid_candidate_minimum,
-        retrieval_mode=retrieval_mode,
-        summary_strategy=summary_strategy,
-        embedding_provider=embedding_provider,
-        reranker_provider=reranker_provider,
+        retrieval=SimpleNamespace(
+            retrieval_top_k=5,
+            retrieval_mode=retrieval_mode,
+            summary_strategy=summary_strategy,
+            hybrid_candidate_multiplier=hybrid_candidate_multiplier,
+            hybrid_candidate_minimum=hybrid_candidate_minimum,
+            embedding_provider=embedding_provider,
+            reranker_provider=reranker_provider,
+        ),
     )
 
 

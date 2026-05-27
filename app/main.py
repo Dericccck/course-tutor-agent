@@ -119,14 +119,14 @@ if __name__ == "__main__":
     vector_store = None
     reranker = None
     
-    if settings.retrieval_mode in {"vector", "hybrid"}:
+    if settings.retrieval.retrieval_mode in {"vector", "hybrid"}:
         vector_store = build_vector_store_with_cache(settings, chunks) # 构建一个带缓存机制的向量存储服务 - 这里我们把之前 main.py 里关于向量索引构建和缓存恢复的逻辑抽成了一个独立的服务函数 build_vector_store_with_cache，这样不仅让 main.py 的代码更简洁清晰，也让这个向量索引构建和缓存恢复的功能变得更可复用，在其他地方如果需要类似的功能时，就可以直接调用这个服务函数，而不需要重复编写相同的逻辑。这个服务函数会根据当前的配置和数据状态，智能地决定是直接加载缓存来恢复向量索引，还是重新计算 embeddings 来构建向量索引，并且在构建完成后自动更新缓存文件，这样我们就能在保证数据一致性的前提下，显著提升程序的启动速度，尤其是在 chunks 数量较大时。
     
-    if settings.retrieval_mode == "hybrid" and settings.reranker_provider != "none":
+    if settings.retrieval.retrieval_mode == "hybrid" and settings.retrieval.reranker_provider != "none":
         reranker = build_reranker(
-            settings.reranker_provider,
-            settings.reranker_model_name,
-            settings.reranker_cache_dir,
+            settings.retrieval.reranker_provider,
+            settings.retrieval.reranker_model_name,
+            settings.retrieval.reranker_cache_dir,
         )
     
     memory = load_user_memory()

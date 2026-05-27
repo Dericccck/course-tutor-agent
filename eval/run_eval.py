@@ -51,13 +51,13 @@ def get_course_group(source: str) -> str | None:
     return None
 
 def build_active_reranker(settings):
-    if settings.reranker_provider == "none":
+    if settings.retrieval.reranker_provider == "none":
         return None
 
     return build_reranker(
-        settings.reranker_provider,
-        settings.reranker_model_name,
-        settings.reranker_cache_dir,
+        settings.retrieval.reranker_provider,
+        settings.retrieval.reranker_model_name,
+        settings.retrieval.reranker_cache_dir,
     )
 
 def should_run_agent_eval() -> bool:
@@ -105,26 +105,29 @@ def retrieve_for_mode(
         retrieved = retrieve_documents(
             query=question,
             documents=documents,
-            top_k=settings.retrieval_top_k,
+            top_k=settings.retrieval.retrieval_top_k,
         )
     elif mode == "chunk":
         retrieved = retrieve_chunks(
             query=question,
             chunks=chunks,
-            top_k=settings.retrieval_top_k,
+            top_k=settings.retrieval.retrieval_top_k,
         )
     elif mode == "vector":
         if vector_store is None:
             raise ValueError("vector mode requires vector_store")
         retrieved = vector_store.search(
             query=question,
-            top_k=settings.retrieval_top_k,
+            top_k=settings.retrieval.retrieval_top_k,
         )
     elif mode == "hybrid":
         if vector_store is None:
             raise ValueError("hybrid mode requires vector_store")
 
-        candidate_top_k = max(settings.retrieval_top_k * 3, 10)
+        candidate_top_k = max(
+            settings.retrieval.retrieval_top_k * settings.retrieval.hybrid_candidate_multiplier,
+            settings.retrieval.hybrid_candidate_minimum,
+        )
 
         lexical_results = retrieve_chunks(
             query=question,
@@ -138,20 +141,23 @@ def retrieve_for_mode(
         retrieved = merge_retrieval_results(
             lexical_results,
             vector_results,
-            top_k=settings.retrieval_top_k,
+            top_k=settings.retrieval.retrieval_top_k,
         )
         if reranker is not None:
             retrieved = reranker.rerank(
                 question,
                 retrieved,
-                top_k=settings.retrieval_top_k,
+                top_k=settings.retrieval.retrieval_top_k,
             )
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
     task_type = detect_task_type(question)
     if task_type == "summary":
-        retrieved = narrow_summary_results(retrieved)
+        retrieved = narrow_summary_results(
+            retrieved,
+            strategy=settings.retrieval.summary_strategy,
+        )
 
     return retrieved
 
@@ -423,7 +429,10 @@ def main():
         reranker = build_active_reranker(settings)
 
     for mode in modes:
-        mode_settings = replace(settings, retrieval_mode=mode)
+        mode_settings = replace(
+            settings,
+            retrieval=replace(settings.retrieval, retrieval_mode=mode),
+        )
         mode_results: list[dict] = []
         mode_agent_results: list[dict] = []
 

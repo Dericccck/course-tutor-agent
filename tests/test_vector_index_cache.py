@@ -29,10 +29,12 @@ def make_settings(
     embedding_model_name: str = "BAAI/bge-m3",
 ) -> SimpleNamespace:
     return SimpleNamespace(
-        embedding_provider=embedding_provider,
-        embedding_model_name=embedding_model_name,
         course_source_root="/tmp/course-root",
         course_include_dirs=["2-3-ai-agents-for-beginners"],
+        retrieval=SimpleNamespace(
+            embedding_provider=embedding_provider,
+            embedding_model_name=embedding_model_name,
+        ),
     )
 
 

@@ -19,9 +19,9 @@ def build_vector_store_with_cache(settings, chunks: list[DocumentChunk]) -> InMe
     2. 否则，就通过 embedding_provider 计算所有 chunks 的向量表示，并把结果写入缓存文件（如果配置了 vector_index_cache_path）。
     """
     embedding_provider = build_embedding_provider(
-        settings.embedding_provider,
-        model_name=settings.embedding_model_name,
-        cache_folder=settings.embedding_cache_dir,
+        settings.retrieval.embedding_provider,
+        model_name=settings.retrieval.embedding_model_name,
+        cache_folder=settings.retrieval.embedding_cache_dir,
     )
     vector_store = InMemoryVectorStore(embedding_provider)
     cache_loaded = False
