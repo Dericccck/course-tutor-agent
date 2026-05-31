@@ -186,6 +186,14 @@ def normalize_suggestions(
 
     return normalized
 
+def normalize_answer_text(answer_text: str) -> str:
+    text = answer_text.strip()
+
+    if not text:
+        return "根据当前资料，暂时无法生成稳定答案。"
+
+    return text
+
 def ask_course_agent(
     question: str, 
     documents: list[Document], 
@@ -310,8 +318,16 @@ def ask_course_agent(
             sources=fallback_sources,
         )
     
-    answer.sources = normalize_answer_sources(answer.sources, allowed_sources=allowed_sources, fallback_sources=fallback_sources)
-    answer.suggestions = normalize_suggestions(answer.suggestions,question=question,)
+    answer.answer = normalize_answer_text(answer.answer)
+    answer.suggestions = normalize_suggestions(
+        answer.suggestions,
+        question=question,
+    )
+    answer.sources = normalize_answer_sources(
+        answer.sources,
+        allowed_sources=allowed_sources,
+        fallback_sources=fallback_sources,
+    )
 
     return answer
 

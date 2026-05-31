@@ -599,6 +599,18 @@ def test_normalize_suggestions_filters_question_text():
     assert result == ["阅读 04-tool-use 相关 notebook"]
 
 
+def test_normalize_answer_text_strips_whitespace():
+    result = agent.normalize_answer_text("  正常回答内容  ")
+
+    assert result == "正常回答内容"
+
+
+def test_normalize_answer_text_returns_fallback_for_empty_text():
+    result = agent.normalize_answer_text("   ")
+
+    assert result == "根据当前资料，暂时无法生成稳定答案。"
+
+
 def test_ask_course_agent_normalizes_model_suggestions(monkeypatch):
     monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
     monkeypatch.setattr(
@@ -649,6 +661,47 @@ def test_ask_course_agent_normalizes_model_suggestions(monkeypatch):
         "阅读 04-tool-use 相关 notebook",
         "结合规划设计理解工具调用",
     ]
+
+
+def test_ask_course_agent_normalizes_empty_model_answer(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+    monkeypatch.setattr(
+        agent,
+        "retrieve_documents",
+        lambda query, documents, top_k: [make_chunk("04 Tool Use 学习摘要")],
+    )
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content=json.dumps(
+                        {
+                            "answer": "   ",
+                            "suggestions": [],
+                            "sources": ["/tmp/04 Tool Use 学习摘要.md"],
+                        }
+                    )
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(),
+        memory={},
+    )
+
+    assert result.answer == "根据当前资料，暂时无法生成稳定答案。"
 
 
 def test_ask_course_agent_updates_completed_topics_for_summary_with_chunks(monkeypatch):
