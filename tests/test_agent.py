@@ -289,6 +289,55 @@ def test_build_retry_retrieval_queries_includes_goal_scope_and_recent_focus():
     ]
 
 
+def test_build_llm_retry_query_returns_none_for_json_like_response():
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "不是 query", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+
+    result = agent.build_llm_retry_query(
+        "tool use 是什么？",
+        "qa",
+        settings=make_settings(),
+        client=fake_client,
+        memory={},
+    )
+
+    assert result is None
+
+
+def test_build_retry_retrieval_queries_swallows_llm_rewrite_errors():
+    class BrokenCompletions:
+        def create(self, **kwargs):
+            raise RuntimeError("rewrite failed")
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=BrokenCompletions()))
+
+    queries = agent.build_retry_retrieval_queries(
+        "tool use 是什么？",
+        task_type="qa",
+        memory={},
+        settings=make_settings(),
+        client=fake_client,
+    )
+
+    assert queries == [
+        "tool use 是什么？ agent course concept",
+        "04 Tool Use 学习摘要",
+    ]
+
+
 def test_merge_retrieval_results_uses_configured_max_per_source(monkeypatch):
     monkeypatch.setattr(
         agent,

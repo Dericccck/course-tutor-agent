@@ -342,6 +342,7 @@ if __name__ == "__main__":
             print(f"- Initial Queries: {result.debug.get('initial_queries')}")
             print(f"- Retry Triggered: {result.debug.get('retry_triggered')}")
             print(f"- Retry Queries: {result.debug.get('retry_queries')}")
+            print(f"- LLM Retry Query: {result.debug.get('llm_retry_query')}")
             print(f"- Initial Result Count: {result.debug.get('initial_result_count')}")
             print(f"- Final Result Count: {result.debug.get('final_result_count')}")
             print()

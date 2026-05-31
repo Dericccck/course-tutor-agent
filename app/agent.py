@@ -259,6 +259,7 @@ def ask_course_agent(
         "initial_queries": retrieval_queries,
         "retry_triggered": False,
         "retry_queries": [],
+        "llm_retry_query": None,
         "initial_result_count": 0,
         "final_result_count": 0,
     }
@@ -273,6 +274,8 @@ def ask_course_agent(
     )
     debug_info["initial_result_count"] = len(retrieved_chunks)
 
+    client = build_client(active_settings)
+
     if should_retry_retrieval(retrieved_chunks, task_type):# 弱的话，做第二轮更强检索
         debug_info["retry_triggered"] = True
 
@@ -280,8 +283,29 @@ def ask_course_agent(
             question,
             task_type,
             memory=memory,
+            settings=active_settings,
+            client=client,
         )
         debug_info["retry_queries"] = retry_queries
+
+        # 记录模型到底加了什么（多生成1条LLM补强的query）
+        base_retry_queries = dedupe_queries(
+            [
+                f"{question.strip()} notebook lesson summary"
+                if task_type == "summary"
+                else f"{question.strip()} 学习顺序 roadmap lesson"
+                if task_type == "study_plan"
+                else f"{question.strip()} agent course concept"
+            ]
+            + build_anchor_queries(question)
+            + build_memory_queries(task_type, memory=memory)
+        )
+        extra_retry_queries = [
+            item for item in retry_queries
+            if item not in base_retry_queries
+        ]
+        if extra_retry_queries:
+            debug_info["llm_retry_query"] = extra_retry_queries[-1]
 
         if retry_queries:
             retry_chunks = run_retrieval_round(
@@ -311,8 +335,6 @@ def ask_course_agent(
             ),
             sources=[]
         )
-    
-    client = build_client(active_settings)
 
     if task_type == "summary":
         retrieved_chunks = narrow_summary_results(
@@ -672,10 +694,93 @@ def build_retrieval_queries(
     queries.extend(build_memory_queries(task_type, memory=memory))
     return dedupe_queries(queries)
 
-def build_retry_retrieval_queries(
+def build_query_rewrite_prompt( # 小 prompt builder
+    question: str,
+    task_type: str,
+    memory: dict | None = None,
+) -> str:
+    memory = memory or {}
+    goal = memory.get("learning_goal", "").strip()
+    scope = memory.get("preferred_scope", "").strip()
+    recent_focus = memory.get("recent_focus", "").strip()
+
+    return f"""你要为课程检索系统生成 1 条更适合检索的 query。
+
+用户原问题：
+{question}
+
+任务类型：
+{task_type}
+
+用户学习目标：
+{goal or "无"}
+
+用户学习范围：
+{scope or "无"}
+
+最近学习重点：
+{recent_focus or "无"}
+
+要求：
+1. 只输出 1 行 query，不要解释。
+2. query 要更适合课程资料检索。
+3. 尽量保留课程主题词，如 tool use、agentic rag、planning、lesson、notebook。
+4. 如果是 study_plan，可加入“学习顺序 / 学习路线 / roadmap / lesson”等词。
+5. 不要输出 JSON，不要加编号，不要加引号。
+"""
+
+def build_llm_retry_query( # LLM rewrite 函数
+    question: str,
+    task_type: str,
+    settings,
+    client,
+    memory: dict | None = None,
+) -> str | None:
+    prompt = build_query_rewrite_prompt(
+        question,
+        task_type,
+        memory=memory,
+    )
+
+    response = client.chat.completions.create(
+        model=settings.model_name,
+        messages=[
+            {"role": "system", "content": "你是一个课程检索 query rewrite 助手。"},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0,
+    )
+
+    content = response.choices[0].message.content.strip()
+    if not content:
+        return None
+
+    first_line = content.splitlines()[0].strip()
+    if not first_line:
+        return None
+
+    if first_line.startswith("{") or first_line.startswith("["):
+        return None
+
+    if any(token in first_line for token in ['"answer"', '"suggestions"', '"sources"']): # 把“模型回答 JSON”过滤掉，不要当 rewrite query
+        """
+        这样模型一旦返回：
+            JSON
+            列表
+            结构化回答字段
+            
+        就不会被当成 rewrite query。
+        """
+        return None
+
+    return first_line
+
+def build_retry_retrieval_queries( # 触发了retry
         question: str,
         task_type: str,
         memory: dict | None = None,
+        settings=None,
+        client=None,
 ) -> list[str]:
     """
     第二轮更强 query
@@ -692,6 +797,21 @@ def build_retry_retrieval_queries(
 
     queries.extend(build_anchor_queries(question))
     queries.extend(build_memory_queries(task_type, memory=memory))
+
+    
+    if settings is not None and client is not None:
+        try:
+            llm_query = build_llm_retry_query(# 多生成 1 条 LLM 补强 query
+                question,
+                task_type,
+                settings=settings,
+                client=client,
+                memory=memory,
+            )
+        except Exception:
+            llm_query = None
+        if llm_query:
+            queries.append(llm_query)
 
     return dedupe_queries(queries)
 

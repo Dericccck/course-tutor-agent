@@ -113,10 +113,12 @@
 - query rewrite v2 已支持课程标题 / lesson 锚点感知，会把 `04-tool-use`、`05-agentic-rag`、`Lesson 1` 等课程标识转成显式检索锚点
 - query 构造已进一步分层为 `primary queries / anchor queries / memory queries / retry queries`，便于后续继续接 LLM rewrite、structured trace 和 tracing 平台
 - 当首次检索结果过弱时，主流程会自动触发第二轮补强检索，并引入 `learning_goal / preferred_scope / recent_focus` 作为补充 query
+- retry 路径已支持 `LLM rewrite v1`：仅在弱检索补强阶段额外生成 1 条 LLM query；如果 rewrite 失败或返回 JSON/无效内容，会静默降级为规则型 retry
 - `RETRIEVAL_MODE=vector` 时已支持注入 `vector_store`
 - `RETRIEVAL_MODE=hybrid` 时会合并 chunk 检索与向量检索结果
 - `RETRIEVAL_MODE=hybrid` 时会先宽召回，再按优先级与同源限制合并结果
 - 设置 `SHOW_RETRIEVAL_DEBUG=true` 后，CLI 会打印本次问答使用的初始 queries、是否触发 retry、retry queries 以及前后检索结果数量
+- 当存在 LLM 补强 query 时，CLI debug 还会额外打印 `LLM Retry Query`
 
 7. 向量检索链路
 - 支持通过 `build_embedding_text(...)` 统一构造 embedding 输入
