@@ -159,6 +159,10 @@
       "02 Explore Agentic Frameworks",
       "03 Agentic Design Patterns"
     ],
+    "expected_sources_contains": [
+      "2-3-ai-agents-for-beginners/02-explore-agentic-frameworks/notebook-summary.md",
+      "2-3-ai-agents-for-beginners/03-agentic-design-patterns/notebook-summary.md"
+    ],
     "forbidden_answer_contains": [
       "下一步先学 01 Intro",
       "先学习 01 Intro To AI Agents"
@@ -192,6 +196,11 @@
       "01 Intro To AI Agents",
       "02 Explore Agentic Frameworks",
       "03 Agentic Design Patterns"
+    ],
+    "expected_sources_contains": [
+      "2-3-ai-agents-for-beginners/01-intro-to-ai-agents/notebook-summary.md",
+      "2-3-ai-agents-for-beginners/02-explore-agentic-frameworks/notebook-summary.md",
+      "2-3-ai-agents-for-beginners/03-agentic-design-patterns/notebook-summary.md"
     ],
     "forbidden_answer_contains": [],
     "allow_cross_document": true,

@@ -324,6 +324,19 @@ def evaluate_agent_sample(sample: dict, answer_result) -> dict:
     )
     return evaluated
 
+def should_run_agent_sample(sample: dict) -> bool:
+    """控制哪些样本进入真实 Agent Eval，避免一次性把所有题都打到模型。"""
+    allowed_ids = {
+        "study-plan-agent-001",
+        "study-plan-scope-001",
+        "study-plan-rag-001",
+        "qa-tool-use-001",
+        "qa-agentic-rag-001",
+        "summary-tool-use-001",
+        "summary-agentic-rag-001",
+    }
+    return sample["id"] in allowed_ids
+
 
 def print_mode_summary(mode: str, results: list[dict]) -> None:
     total = len(results)
@@ -401,7 +414,7 @@ def print_agent_summary(mode: str, results: list[dict]) -> None:
     ]
     source_hits = sum(1 for item in source_hit_items if item["source_citation_hit"])
 
-    print(f"\n=== Agent Mode: {mode} (study_plan only) ===")
+    print(f"\n=== Agent Mode: {mode} (selected samples) ===")
     print(f"Total: {total}")
     print(f"Primary Hit: {primary_hits}/{total}")
     print(f"Group Hit: {group_hits}/{total}")
@@ -513,7 +526,7 @@ def main():
             evaluated = evaluate_sample(sample, retrieved)
             mode_results.append(evaluated)
 
-            if run_agent_eval and sample["task_type"] == "study_plan":
+            if run_agent_eval and should_run_agent_sample(sample):
                 answer_result = ask_course_agent(
                     question=sample["question"],
                     documents=documents,

@@ -171,3 +171,12 @@ def test_evalvate_answer_sources_returns_none_when_not_configured():
     assert result["expected_sources_contains"] == []
     assert result["source_hits"] == []
     assert result["source_citation_hit"] is None
+
+
+def test_should_run_agent_sample_respects_selected_sample_whitelist():
+    run_eval = load_run_eval_module()
+
+    assert run_eval.should_run_agent_sample({"id": "study-plan-rag-001"}) is True
+    assert run_eval.should_run_agent_sample({"id": "qa-tool-use-001"}) is True
+    assert run_eval.should_run_agent_sample({"id": "summary-agentic-rag-001"}) is True
+    assert run_eval.should_run_agent_sample({"id": "qa-planning-agent-001"}) is False

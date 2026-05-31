@@ -179,6 +179,15 @@
 - 当前评估分为两层：
   - Retrieval Eval：看 source 命中与课程簇覆盖
   - Agent Eval：看真实 `ask_course_agent(...)` 输出
+- Agent Eval 当前默认只覆盖一小组 `selected samples`：
+  - `study-plan-agent-001`
+  - `study-plan-scope-001`
+  - `study-plan-rag-001`
+  - `qa-tool-use-001`
+  - `qa-agentic-rag-001`
+  - `summary-tool-use-001`
+  - `summary-agentic-rag-001`
+  - 这样可以先稳定监控 grounding / citation，而不用一次把所有样本都打到真实模型
 - 评估默认配置文件位于 `eval/eval_config.json`
 - 当前可配置：
   - `default_run_agent_eval`
