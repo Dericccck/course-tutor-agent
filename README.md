@@ -109,6 +109,7 @@
 - 当前主流程默认优先使用 chunk 检索结果
 - 可通过 `RETRIEVAL_MODE` 切回整篇文档检索
 - 保留整篇文档检索作为 fallback
+- 首次检索已支持规则型 multi-query 扩展：保留原始问题，并为 `qa / summary / study_plan` 补少量增强 query 后再合并结果
 - `RETRIEVAL_MODE=vector` 时已支持注入 `vector_store`
 - `RETRIEVAL_MODE=hybrid` 时会合并 chunk 检索与向量检索结果
 - `RETRIEVAL_MODE=hybrid` 时会先宽召回，再按优先级与同源限制合并结果

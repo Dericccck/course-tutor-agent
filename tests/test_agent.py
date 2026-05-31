@@ -133,6 +133,72 @@ def test_detect_task_type_uses_configured_keywords(monkeypatch):
     assert agent.detect_task_type("tool use 是什么") == "qa"
 
 
+def test_build_retrieval_queries_adds_rule_based_qa_expansion():
+    queries = agent.build_retrieval_queries(
+        "tool use 是什么？",
+        task_type="qa",
+        memory={},
+    )
+
+    assert queries == [
+        "tool use 是什么？",
+        "tool use agent tool calling",
+    ]
+
+
+def test_build_retrieval_queries_adds_study_plan_goal_expansion():
+    queries = agent.build_retrieval_queries(
+        "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
+        task_type="study_plan",
+        memory={"learning_goal": "我想重点学习 RAG，并进一步过渡到 Agentic RAG"},
+    )
+
+    assert queries == [
+        "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
+        "我想重点学习 RAG，并进一步过渡到 Agentic RAG 学习顺序 学习路线",
+    ]
+
+
+def test_merge_multi_query_results_deduplicates_and_keeps_highest_score():
+    result_groups = [
+        [
+            RetrievedChunk(
+                source="/tmp/tool.md",
+                title="04 Tool Use 学习摘要",
+                chunk_id="tool-1",
+                snippet="tool low",
+                score=8.0,
+                tags=["agent"],
+            ),
+            RetrievedChunk(
+                source="/tmp/framework.md",
+                title="02 Explore Agentic Frameworks 学习摘要",
+                chunk_id="framework-1",
+                snippet="framework",
+                score=7.5,
+                tags=["agent"],
+            ),
+        ],
+        [
+            RetrievedChunk(
+                source="/tmp/tool.md",
+                title="04 Tool Use 学习摘要",
+                chunk_id="tool-1",
+                snippet="tool high",
+                score=9.5,
+                tags=["agent"],
+            ),
+        ],
+    ]
+
+    merged = agent.merge_multi_query_results(result_groups, top_k=5)
+
+    assert [(item.source, item.chunk_id, item.score) for item in merged] == [
+        ("/tmp/tool.md", "tool-1", 9.5),
+        ("/tmp/framework.md", "framework-1", 7.5),
+    ]
+
+
 def test_merge_retrieval_results_uses_configured_max_per_source(monkeypatch):
     monkeypatch.setattr(
         agent,
@@ -335,6 +401,58 @@ def test_ask_course_agent_prefers_chunk_retrieval_when_chunks_provided(monkeypat
     assert result.answer == "chunk 检索结果"
 
 
+def test_ask_course_agent_runs_chunk_retrieval_for_each_query(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+    seen_queries: list[str] = []
+
+    def fake_retrieve_chunks(query, chunks, top_k):
+        seen_queries.append(query)
+        return [
+            RetrievedChunk(
+                source=f"/tmp/{query}.md",
+                title=f"{query} 标题",
+                chunk_id=f"{query}-chunk-1",
+                snippet=query,
+                score=10.0 if len(seen_queries) == 1 else 9.0,
+                tags=["agent"],
+            )
+        ]
+
+    monkeypatch.setattr(agent, "retrieve_chunks", fake_retrieve_chunks)
+    monkeypatch.setattr(agent, "retrieve_documents", lambda query, documents, top_k: [])
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "chunk 多 query 检索结果", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(),
+        memory={},
+        chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+    )
+
+    assert seen_queries == [
+        "tool use 是什么？",
+        "tool use agent tool calling",
+    ]
+    assert result.answer == "chunk 多 query 检索结果"
+
+
 def test_ask_course_agent_uses_document_retrieval_when_mode_is_document(monkeypatch):
     # 即使传入了 chunks，只要 retrieval_mode=document，也应走文档级检索
     monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
@@ -397,7 +515,7 @@ def test_ask_course_agent_raises_for_vector_retrieval_mode(monkeypatch):
         )
         assert False, "ask_course_agent should raise ValueError when vector_store is missing"
     except ValueError as exc:
-        assert "Vector store must be provided" in str(exc)
+        assert "vector mode requires vector_store" in str(exc)
 
 
 def test_ask_course_agent_uses_vector_store_when_mode_is_vector(monkeypatch):
@@ -895,7 +1013,7 @@ def test_ask_course_agent_raises_when_hybrid_mode_missing_vector_store(monkeypat
         )
         assert False, "ask_course_agent should raise ValueError when hybrid vector_store is missing"
     except ValueError as exc:
-        assert "Vector store must be provided" in str(exc)
+        assert "hybrid mode requires vector_store" in str(exc)
 
 
 def test_narrow_summary_results_keeps_only_first_source():
@@ -1190,6 +1308,93 @@ def test_ask_course_agent_uses_reranker_for_hybrid_results(monkeypatch):
     ]
 
 
+def test_ask_course_agent_merges_multi_query_hybrid_results_before_rerank(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+    lexical_queries: list[str] = []
+    vector_queries: list[str] = []
+
+    def fake_retrieve_chunks(query, chunks, top_k):
+        lexical_queries.append(query)
+        return [
+            RetrievedChunk(
+                source=f"/tmp/lexical-{len(lexical_queries)}.md",
+                title=f"lexical-{len(lexical_queries)}",
+                chunk_id=f"lexical-{len(lexical_queries)}",
+                snippet=query,
+                score=10.0 - len(lexical_queries),
+                tags=["agent"],
+            )
+        ]
+
+    class FakeVectorStore:
+        def search(self, query, top_k=5):
+            vector_queries.append(query)
+            return [
+                RetrievedChunk(
+                    source=f"/tmp/vector-{len(vector_queries)}.md",
+                    title=f"vector-{len(vector_queries)}",
+                    chunk_id=f"vector-{len(vector_queries)}",
+                    snippet=query,
+                    score=8.0 - len(vector_queries),
+                    tags=["agent"],
+                )
+            ]
+
+    monkeypatch.setattr(agent, "retrieve_chunks", fake_retrieve_chunks)
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "hybrid 多 query 结果", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    reranker = FakeReranker(
+        results=[
+            RetrievedChunk(
+                source="/tmp/reranked.md",
+                title="reranked",
+                chunk_id="reranked-1",
+                snippet="reranked result",
+                score=99.0,
+                tags=["agent"],
+            )
+        ]
+    )
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(retrieval_mode="hybrid"),
+        memory={},
+        chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+        vector_store=FakeVectorStore(),
+        reranker=reranker,
+    )
+
+    assert lexical_queries == [
+        "tool use 是什么？",
+        "tool use agent tool calling",
+    ]
+    assert vector_queries == [
+        "tool use 是什么？",
+        "tool use agent tool calling",
+    ]
+    assert len(reranker.calls) == 1
+    assert len(reranker.calls[0][1]) == 4
+    assert result.answer == "hybrid 多 query 结果"
+
+
 def test_ask_course_agent_uses_configured_hybrid_candidate_pool(monkeypatch):
     monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
     lexical_top_ks: list[int] = []
@@ -1254,8 +1459,8 @@ def test_ask_course_agent_uses_configured_hybrid_candidate_pool(monkeypatch):
         vector_store=FakeVectorStore(),
     )
 
-    assert lexical_top_ks == [20]
-    assert vector_top_ks == [20]
+    assert lexical_top_ks == [20, 20]
+    assert vector_top_ks == [20, 20]
     assert result.answer == "hybrid 候选池结果"
 
 

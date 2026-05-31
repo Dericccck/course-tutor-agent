@@ -127,6 +127,26 @@ def merge_retrieval_results(
 
     return merged
 
+def merge_multi_query_results(
+        result_groups: list[list[RetrievedChunk]],
+        top_k: int,
+) -> list[RetrievedChunk]:
+    """合并多条 query 检索结果；相同chunk保留最高分。"""
+    best_by_key: dict[tuple[str, str | None], RetrievedChunk] = {}
+
+    for group in result_groups:
+        for item in group:
+            key = (item.source, item.chunk_id)
+            existing = best_by_key.get(key)
+            if existing is None or item.score > existing.score:
+                best_by_key[key] = item
+    merged = sorted(
+        best_by_key.values(),
+        key=lambda item: item.score,
+        reverse=True
+    )
+    return merged[:top_k]
+
 # 根据任务类型选择要放入 prompt 的检索结果数量和策略。对于总结类问题，我们可能只需要最相关的 3-4 条资料来生成高质量的总结；对于学习计划类问题，我们可能需要更多的资料来全面评估和安排学习路线；而对于一般的问答类问题，我们可能只需要最相关的 1-3 条资料来直接回答用户的问题。
 def select_prompt_chunks(task_type: str, retrieved_chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
     limits = {
@@ -205,52 +225,114 @@ def ask_course_agent(
     ) -> AgentAnswer:
     active_settings = settings or get_settings()
     validate_settings(active_settings)
+    task_type = detect_task_type(question)
+    retrieval_queries = build_retrieval_queries(
+        question,
+        task_type,
+        memory=memory,
+    )
 
-    if active_settings.retrieval.retrieval_mode == "hybrid": # 混合检索
+    if active_settings.retrieval.retrieval_mode == "chunk":
+        if chunks is not None:
+            result_groups = [
+                retrieve_chunks(
+                    query=query,
+                    chunks=chunks,
+                    top_k=active_settings.retrieval.retrieval_top_k,
+                )
+                for query in retrieval_queries
+            ]
+        else:
+            result_groups = [
+                retrieve_documents(
+                    query=query,
+                    documents=documents,
+                    top_k=active_settings.retrieval.retrieval_top_k,
+                )
+                for query in retrieval_queries
+            ]
+
+        retrieved_chunks = merge_multi_query_results(
+            result_groups,
+            top_k=active_settings.retrieval.retrieval_top_k,
+        )
+    elif active_settings.retrieval.retrieval_mode == "document":# 否则就退回到最原始的文档级检索（虽然效率更低，但至少能工作）
+        result_groups = [
+            retrieve_documents(
+                query=query,
+                documents=documents,
+                top_k=active_settings.retrieval.retrieval_top_k,
+            )
+            for query in retrieval_queries
+        ]
+        retrieved_chunks = merge_multi_query_results(
+            result_groups,
+            top_k=active_settings.retrieval.retrieval_top_k,
+        )
+    elif active_settings.retrieval.retrieval_mode == "hybrid":# 混合检索
+        """
+            每个 query 都做一轮 lexical + vector + merge
+            然后多 query 再 merge
+            最后 rerank 一次
+        """
         if chunks is None:
-            raise ValueError("Chunks data must be provided when RETRIEVAL_MODE=hybrid.")
+            raise ValueError("chunk mode requires chunks")
         if vector_store is None:
-            raise ValueError("Vector store must be provided when RETRIEVAL_MODE=hybrid.")
+            raise ValueError("hybrid mode requires vector_store")
+
         candidate_top_k = max(
-            active_settings.retrieval.retrieval_top_k * active_settings.retrieval.hybrid_candidate_multiplier,
+            active_settings.retrieval.retrieval_top_k
+            * active_settings.retrieval.hybrid_candidate_multiplier,
             active_settings.retrieval.hybrid_candidate_minimum,
         )
-        # 这里先让 lexical_results 放前面，是因为：标题/关键词精确命中对课程问答很重要    vector 先作为补充召回
-        lexical_results = retrieve_chunks(
-            query=question,
-            chunks=chunks,
-            top_k=candidate_top_k,
-        )
-        vector_results = vector_store.search(
-            query=question,
-            top_k=candidate_top_k,
-        )
-        retrieved_chunks = merge_retrieval_results(lexical_results, vector_results, top_k=active_settings.retrieval.retrieval_top_k) # lexical 定主轴，vector 做补充
-        if reranker is not None: # 如果提供了 reranker，就对混合检索的结果进行重新排序，进一步提升相关性。这里我们把混合检索的结果作为 reranker 的输入，让它根据查询和每条结果的内容来打分排序，从而把最相关的结果排在前面，提升最终返回给用户的答案的质量和准确性。
+
+        hybrid_groups: list[list[RetrievedChunk]] = []
+
+        for query in retrieval_queries:
+            # 这里先让 lexical_results 放前面，是因为：标题/关键词精确命中对课程问答很重要    vector 先作为补充召回
+            lexical_results = retrieve_chunks(
+                query=query,
+                chunks=chunks,
+                top_k=candidate_top_k,
+            )
+            vector_results = vector_store.search(
+                query=query,
+                top_k=candidate_top_k,
+            )
+            merged_results = merge_retrieval_results(
+                lexical_results,
+                vector_results,
+                top_k=active_settings.retrieval.retrieval_top_k,
+            )
+            hybrid_groups.append(merged_results)
+
+        retrieved_chunks = merge_multi_query_results(
+            hybrid_groups,
+            top_k=active_settings.retrieval.retrieval_top_k,
+        )# lexical 定主轴，vector 做补充
+
+        if reranker is not None:# 如果提供了 reranker，就对混合检索的结果进行重新排序，进一步提升相关性。这里我们把混合检索的结果作为 reranker 的输入，让它根据查询和每条结果的内容来打分排序，从而把最相关的结果排在前面，提升最终返回给用户的答案的质量和准确性。
             retrieved_chunks = reranker.rerank(
                 question,
                 retrieved_chunks,
                 top_k=active_settings.retrieval.retrieval_top_k,
             )
-    elif active_settings.retrieval.retrieval_mode == "vector": # 目前向量检索还没做，所以先直接报错，等后续完善了再放开这个选项
+    elif active_settings.retrieval.retrieval_mode == "vector":
         if vector_store is None:
-            raise ValueError("Vector store must be provided when RETRIEVAL_MODE=vector.")
-        retrieved_chunks = vector_store.search(
-            query=question, 
+            raise ValueError("vector mode requires vector_store")
+
+        result_groups = [
+            vector_store.search(
+                query=query,
+                top_k=active_settings.retrieval.retrieval_top_k,
+            )
+            for query in retrieval_queries
+        ]
+        retrieved_chunks = merge_multi_query_results(
+            result_groups,
             top_k=active_settings.retrieval.retrieval_top_k,
         )
-    elif active_settings.retrieval.retrieval_mode == "chunk" and chunks is not None: # 优先使用切分后的 chunk 进行检索，只有在没有提供 chunks 或者 retrieval_mode 设置为 document 时才退回到文档级检索
-        retrieved_chunks = retrieve_chunks(
-            query=question,
-            chunks=chunks,
-            top_k=active_settings.retrieval.retrieval_top_k,
-        )
-    else: # 否则就退回到最原始的文档级检索（虽然效率更低，但至少能工作）
-        retrieved_chunks = retrieve_documents(
-            query=question,
-            documents=documents,
-            top_k=active_settings.retrieval.retrieval_top_k,
-        )
+
 
     if not retrieved_chunks:
         runtime_config = load_agent_runtime_config()
@@ -268,7 +350,6 @@ def ask_course_agent(
         )
     
     client = build_client(active_settings)
-    task_type = detect_task_type(question)
 
     if task_type == "summary":
         retrieved_chunks = narrow_summary_results(
@@ -372,6 +453,46 @@ def detect_task_type(question: str) -> str:
             return "study_plan"
 
     return "qa"
+
+def build_retrieval_queries(
+        question: str,
+        task_type: str,
+        memory: dict | None = None
+) -> list[str]:
+    """为一次检索构造原始 query 和少量增强 query。"""
+    queries: list[str] = [question.strip()]
+    lowered = question.lower()
+
+    if task_type == "qa":
+        if "tool use" in lowered:
+            queries.append("tool use agent tool calling")
+        elif "agentic rag" in lowered:
+            queries.append("agentic rag retrieval augmented generation agent")
+        elif "planning" in lowered:
+            queries.append("planning agent task decomposition reasoning")
+        elif "memory" in lowered:
+            queries.append("agent memory short term long term memory")
+
+    elif task_type == "summary":
+        queries.append(f"{question.strip()} notebook lesson 总结")
+
+    elif task_type == "study_plan":
+        goal = (memory or {}).get("learning_goal", "").strip()
+        if goal:
+            queries.append(f"{goal} 学习顺序 学习路线")
+        else:
+            queries.append(f"{question.strip()} 学习顺序 lesson roadmap")
+
+    seen: set[str] = set()
+    deduped_queries: list[str] = []
+    for item in queries:
+        text = item.strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        deduped_queries.append(text)
+
+    return deduped_queries
 
 
 def update_completed_topic(memory: dict, topic_title: str) -> None:
