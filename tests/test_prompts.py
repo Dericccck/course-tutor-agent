@@ -7,6 +7,7 @@
 from prompts import (
     build_context_block,
     build_memory_block,
+    build_summary_prompt,
     build_study_plan_prompt,
     build_user_prompt,
 )
@@ -68,7 +69,31 @@ def test_build_user_prompt_contains_question_memory_and_context():
     assert "学习目标" in prompt
     assert "04 Tool Use 学习摘要" in prompt
     assert "优先基于前 3 条资料回答" in prompt
+    assert "先用 1 句话直接回答用户问题，再用 2-4 句补充解释" in prompt
+    assert "不要写成长篇综述" in prompt
     assert "列出你实际使用的资料来源路径" in prompt
+
+
+def test_build_summary_prompt_enforces_three_line_structure():
+    chunks = [
+        make_chunk(
+            "05 Agentic RAG 学习摘要",
+            "/tmp/05-agentic-rag/notebook-summary.md",
+        )
+    ]
+
+    prompt = build_summary_prompt(
+        "帮我总结 05-agentic-rag 这一节在讲什么",
+        chunks,
+        memory={},
+    )
+
+    assert "回答尽量控制在 3 段以内，不要写成松散长文" in prompt
+    assert "answer 请直接按下面 3 行结构输出，不要把三点合并成一整段" in prompt
+    assert "1. 这节课主要讲什么：..." in prompt
+    assert "2. 它解决了什么问题：..." in prompt
+    assert "3. 关键收获是什么：..." in prompt
+    assert "每一行控制在 1-3 句" in prompt
 
 
 def test_build_study_plan_prompt_splits_remaining_and_completed_titles():
