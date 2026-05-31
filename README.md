@@ -160,6 +160,14 @@
 - 后续如果要调整学习顺序，不再需要改 `agent.py`，只需要改配置文件
 - CLI 里的学习进度推荐与阶段判断也已复用 `default_title_order`
 - `show_progress`、`get_next_recommended_topic()`、`get_learning_stage()` 和学习路线后排序现在共用同一份学习路径配置
+- `agent.py` 的运行时规则配置文件位于 `data/agent_runtime_config.json`
+- 当前可配置：
+  - `task_routing.summary_keywords`
+  - `task_routing.study_plan_keywords`
+  - `retrieval_merge.max_per_source`
+  - `retrieval_merge.prioritize_same_group_secondary`
+  - `fallback.no_results_answer`
+  - `fallback.no_results_suggestions`
 - `SUMMARY_STRATEGY` 用于控制 summary 场景的结果收窄策略
 - 当前仅支持：
   - `same-source`

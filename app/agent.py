@@ -23,6 +23,9 @@ from schemas import AgentAnswer, Document, DocumentChunk, RetrievedChunk
 STUDY_PLAN_ORDER_PATH = (
     Path(__file__).resolve().parents[1] / "data" / "study_plan_order.json"
 )
+AGENT_RUNTIME_CONFIG_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "agent_runtime_config.json"
+)
 
 def build_client(settings: Settings) -> OpenAI:
     client_kwargs = {"api_key": settings.api_key}
@@ -35,6 +38,11 @@ def build_client(settings: Settings) -> OpenAI:
 def load_study_plan_order_config() -> dict:
     """读取 study_plan 排序配置。"""
     with STUDY_PLAN_ORDER_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_agent_runtime_config() -> dict:
+    with AGENT_RUNTIME_CONFIG_PATH.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 # 这个函数的作用是从给定的 source 路径中提取课程组信息。我们假设课程组的信息包含在路径的某个部分，并且以 "1-" 或 "2-" 开头。通过这个函数，我们可以在后续的检索结果排序中优先展示与用户问题相关的课程组内容，从而提升用户体验和检索结果的相关性。
@@ -70,8 +78,17 @@ def merge_retrieval_results(
     primary: list[RetrievedChunk],
     secondary: list[RetrievedChunk],
     top_k: int,
-    max_per_source: int = 2,
+    max_per_source: int | None = None,
 ) -> list[RetrievedChunk]:
+    runtime_config = load_agent_runtime_config()
+    merge_config = runtime_config.get("retrieval_merge", {})
+    if max_per_source is None:
+        max_per_source = merge_config.get("max_per_source", 2)
+    prioritize_same_group_secondary = merge_config.get(
+        "prioritize_same_group_secondary",
+        True,
+    )
+
     merged: list[RetrievedChunk] = []
     seen: set[tuple[str, str | None]] = set() # 用于去重，记录已经添加过的 (source, chunk_id) 组合
     source_counts: dict[str, int] = {} # 记录每个 source 已经添加了多少条结果 (同源限流)
@@ -87,7 +104,10 @@ def merge_retrieval_results(
         else:
             other_group_secondary.append(item)
 
-    candidates = primary + same_group_secondary + other_group_secondary
+    if prioritize_same_group_secondary:
+        candidates = primary + same_group_secondary + other_group_secondary
+    else:
+        candidates = primary + secondary
 
     for item in candidates: # 按照 primary 结果优先、同组 secondary 结果次之、其他 secondary 结果最后的顺序来遍历候选项，依次添加到 merged 结果中，同时进行去重和同源限流，直到达到 top_k 条结果为止。
         key = (item.source, item.chunk_id)
@@ -166,9 +186,17 @@ def ask_course_agent(
         )
 
     if not retrieved_chunks:
+        runtime_config = load_agent_runtime_config()
+        fallback_config = runtime_config.get("fallback", {})
         return AgentAnswer(
-            answer="当前没有检索到相关课程资料，暂时无法回答这个问题",
-            suggestions=["换一个更具体的问题试试","优先使用课程名称、章节名或关键词提问"],
+            answer=fallback_config.get(
+                "no_results_answer",
+                "当前没有检索到相关课程资料，暂时无法回答这个问题",
+            ),
+            suggestions=fallback_config.get(
+                "no_results_suggestions",
+                ["换一个更具体的问题试试", "优先使用课程名称、章节名或关键词提问"],
+            ),
             sources=[]
         )
     
@@ -224,28 +252,34 @@ def ask_course_agent(
 
 def detect_task_type(question: str) -> str:
     lowered = question.lower()
-
-    summary_keywords = [
-        "总结",
-        "概述",
-        "概要",
-        "讲什么",
-        "这一节",
-        "这节课",
-        "notebook",
-        "lesson",
-    ]
-
-    study_plan_keywords = [
-        "学习顺序",
-        "学习路线",
-        "学习计划",
-        "怎么学",
-        "从哪里开始",
-        "先学什么",
-        "roadmap",
-        "plan",
-    ]
+    runtime_config = load_agent_runtime_config()
+    task_routing = runtime_config.get("task_routing", {})
+    summary_keywords = task_routing.get(
+        "summary_keywords",
+        [
+            "总结",
+            "概述",
+            "概要",
+            "讲什么",
+            "这一节",
+            "这节课",
+            "notebook",
+            "lesson",
+        ],
+    )
+    study_plan_keywords = task_routing.get(
+        "study_plan_keywords",
+        [
+            "学习顺序",
+            "学习路线",
+            "学习计划",
+            "怎么学",
+            "从哪里开始",
+            "先学什么",
+            "roadmap",
+            "plan",
+        ],
+    )
 
     for keyword in summary_keywords:
         if keyword in lowered:

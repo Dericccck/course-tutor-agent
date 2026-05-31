@@ -78,6 +78,16 @@ def test_ask_course_agent_returns_fallback_when_no_retrieved_chunks(monkeypatch)
     # 当检索结果为空时，应直接返回兜底回答，而不是继续调模型
     monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
     monkeypatch.setattr(agent, "retrieve_documents", lambda query, documents, top_k: [])
+    monkeypatch.setattr(
+        agent,
+        "load_agent_runtime_config",
+        lambda: {
+            "fallback": {
+                "no_results_answer": "当前没有检索到相关课程资料，暂时无法回答这个问题",
+                "no_results_suggestions": ["换一个更具体的问题试试", "优先使用课程名称、章节名或关键词提问"],
+            }
+        },
+    )
 
     result = agent.ask_course_agent(
         question="一个完全找不到资料的问题",
@@ -104,6 +114,94 @@ def test_is_rag_study_plan_question_uses_configured_keywords(monkeypatch):
     assert agent.is_rag_study_plan_question("我想重点学 Agentic RAG") is True
     assert agent.is_rag_study_plan_question("我想重点学检索增强生成") is True
     assert agent.is_rag_study_plan_question("我想学多 agent 协作") is False
+
+
+def test_detect_task_type_uses_configured_keywords(monkeypatch):
+    monkeypatch.setattr(
+        agent,
+        "load_agent_runtime_config",
+        lambda: {
+            "task_routing": {
+                "summary_keywords": ["复盘"],
+                "study_plan_keywords": ["路线图"],
+            }
+        },
+    )
+
+    assert agent.detect_task_type("帮我复盘这一节") == "summary"
+    assert agent.detect_task_type("请给我一个学习路线图") == "study_plan"
+    assert agent.detect_task_type("tool use 是什么") == "qa"
+
+
+def test_merge_retrieval_results_uses_configured_max_per_source(monkeypatch):
+    monkeypatch.setattr(
+        agent,
+        "load_agent_runtime_config",
+        lambda: {
+            "retrieval_merge": {
+                "max_per_source": 1,
+                "prioritize_same_group_secondary": True,
+            }
+        },
+    )
+
+    primary = [
+        RetrievedChunk(
+            source="/tmp/a.md",
+            title="A1",
+            chunk_id="a-1",
+            snippet="A1",
+            score=10.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/a.md",
+            title="A2",
+            chunk_id="a-2",
+            snippet="A2",
+            score=9.5,
+            tags=["agent"],
+        ),
+    ]
+    secondary = [
+        RetrievedChunk(
+            source="/tmp/b.md",
+            title="B1",
+            chunk_id="b-1",
+            snippet="B1",
+            score=9.0,
+            tags=["agent"],
+        )
+    ]
+
+    merged = agent.merge_retrieval_results(primary, secondary, top_k=3)
+
+    assert [item.chunk_id for item in merged] == ["a-1", "b-1"]
+
+
+def test_ask_course_agent_uses_configured_no_results_fallback(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+    monkeypatch.setattr(agent, "retrieve_documents", lambda query, documents, top_k: [])
+    monkeypatch.setattr(
+        agent,
+        "load_agent_runtime_config",
+        lambda: {
+            "fallback": {
+                "no_results_answer": "自定义兜底回答",
+                "no_results_suggestions": ["建议一", "建议二"],
+            }
+        },
+    )
+
+    result = agent.ask_course_agent(
+        question="一个完全找不到资料的问题",
+        documents=[make_document()],
+        settings=make_settings(),
+        memory={},
+    )
+
+    assert result.answer == "自定义兜底回答"
+    assert result.suggestions == ["建议一", "建议二"]
 
 
 def test_ask_course_agent_updates_completed_topics_for_summary(monkeypatch):

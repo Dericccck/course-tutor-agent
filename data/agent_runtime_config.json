@@ -1,0 +1,35 @@
+{
+  "task_routing": {
+    "summary_keywords": [
+      "总结",
+      "概述",
+      "概要",
+      "讲什么",
+      "这一节",
+      "这节课",
+      "notebook",
+      "lesson"
+    ],
+    "study_plan_keywords": [
+      "学习顺序",
+      "学习路线",
+      "学习计划",
+      "怎么学",
+      "从哪里开始",
+      "先学什么",
+      "roadmap",
+      "plan"
+    ]
+  },
+  "retrieval_merge": {
+    "max_per_source": 2,
+    "prioritize_same_group_secondary": true
+  },
+  "fallback": {
+    "no_results_answer": "当前没有检索到相关课程资料，暂时无法回答这个问题",
+    "no_results_suggestions": [
+      "换一个更具体的问题试试",
+      "优先使用课程名称、章节名或关键词提问"
+    ]
+  }
+}
