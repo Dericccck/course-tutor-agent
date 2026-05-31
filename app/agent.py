@@ -462,6 +462,7 @@ def build_retrieval_queries(
     """为一次检索构造原始 query 和少量增强 query。"""
     queries: list[str] = [question.strip()]
     lowered = question.lower()
+    recent_focus = (memory or {}).get("recent_focus", "").strip()
 
     if task_type == "qa":
         if "tool use" in lowered:
@@ -482,6 +483,14 @@ def build_retrieval_queries(
             queries.append(f"{goal} 学习顺序 学习路线")
         else:
             queries.append(f"{question.strip()} 学习顺序 lesson roadmap")
+
+    if recent_focus:# 最近在学什么
+        if task_type == "study_plan":
+            queries.append(f"{recent_focus} 学习顺序 学习路线")
+        elif task_type == "summary":
+            queries.append(f"{recent_focus} lesson notebook 总结")
+        else:
+            queries.append(recent_focus)
 
     seen: set[str] = set()
     deduped_queries: list[str] = []

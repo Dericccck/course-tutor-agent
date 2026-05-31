@@ -146,6 +146,20 @@ def test_build_retrieval_queries_adds_rule_based_qa_expansion():
     ]
 
 
+def test_build_retrieval_queries_includes_recent_focus_for_qa():
+    queries = agent.build_retrieval_queries(
+        "tool use 是什么？",
+        task_type="qa",
+        memory={"recent_focus": "Tool use 与 agent tool calling"},
+    )
+
+    assert queries == [
+        "tool use 是什么？",
+        "tool use agent tool calling",
+        "Tool use 与 agent tool calling",
+    ]
+
+
 def test_build_retrieval_queries_adds_study_plan_goal_expansion():
     queries = agent.build_retrieval_queries(
         "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
@@ -156,6 +170,37 @@ def test_build_retrieval_queries_adds_study_plan_goal_expansion():
     assert queries == [
         "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
         "我想重点学习 RAG，并进一步过渡到 Agentic RAG 学习顺序 学习路线",
+    ]
+
+
+def test_build_retrieval_queries_includes_recent_focus_for_summary():
+    queries = agent.build_retrieval_queries(
+        "帮我总结 05-agentic-rag 这一节在讲什么",
+        task_type="summary",
+        memory={"recent_focus": "05 Agentic RAG 总结"},
+    )
+
+    assert queries == [
+        "帮我总结 05-agentic-rag 这一节在讲什么",
+        "帮我总结 05-agentic-rag 这一节在讲什么 notebook lesson 总结",
+        "05 Agentic RAG 总结 lesson notebook 总结",
+    ]
+
+
+def test_build_retrieval_queries_includes_recent_focus_for_study_plan():
+    queries = agent.build_retrieval_queries(
+        "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
+        task_type="study_plan",
+        memory={
+            "learning_goal": "我想重点学习 RAG，并进一步过渡到 Agentic RAG",
+            "recent_focus": "RAG 到 Agentic RAG 学习路线",
+        },
+    )
+
+    assert queries == [
+        "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
+        "我想重点学习 RAG，并进一步过渡到 Agentic RAG 学习顺序 学习路线",
+        "RAG 到 Agentic RAG 学习路线 学习顺序 学习路线",
     ]
 
 
