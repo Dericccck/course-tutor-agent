@@ -254,6 +254,15 @@ def ask_course_agent(
         memory=memory,
     )
 
+    debug_info = {
+        "task_type": task_type,
+        "initial_queries": retrieval_queries,
+        "retry_triggered": False,
+        "retry_queries": [],
+        "initial_result_count": 0,
+        "final_result_count": 0,
+    }
+
     retrieved_chunks = run_retrieval_round(
         retrieval_queries=retrieval_queries,
         active_settings=active_settings,
@@ -262,13 +271,18 @@ def ask_course_agent(
         vector_store=vector_store,
         reranker=reranker,
     )
+    debug_info["initial_result_count"] = len(retrieved_chunks)
 
     if should_retry_retrieval(retrieved_chunks, task_type):# 弱的话，做第二轮更强检索
+        debug_info["retry_triggered"] = True
+
         retry_queries = build_retry_retrieval_queries(
             question,
             task_type,
             memory=memory,
         )
+        debug_info["retry_queries"] = retry_queries
+
         if retry_queries:
             retry_chunks = run_retrieval_round(
                 retrieval_queries=retry_queries,
@@ -307,6 +321,8 @@ def ask_course_agent(
         )
     if task_type == "study_plan":
         retrieved_chunks = post_rank_study_plan_results(question, retrieved_chunks)
+    
+    debug_info["final_result_count"] = len(retrieved_chunks)
 
     prompt_chunks = select_prompt_chunks(task_type, retrieved_chunks)
     allowed_sources = build_source_reference_list(prompt_chunks)
@@ -346,6 +362,7 @@ def ask_course_agent(
             answer=raw_content,
             suggestions=[],
             sources=fallback_sources,
+            debug=debug_info,
         )
     
     answer.answer = normalize_answer_text(answer.answer)
@@ -358,6 +375,7 @@ def ask_course_agent(
         allowed_sources=allowed_sources,
         fallback_sources=fallback_sources,
     )
+    answer.debug = debug_info
 
     return answer
 

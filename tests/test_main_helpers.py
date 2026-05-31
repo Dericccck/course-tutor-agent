@@ -39,6 +39,18 @@ def test_print_example_questions_covers_three_core_scenarios(capsys):
     assert "如果我只学 1-* 和 2-*，想做一个 AIAgent 项目，请按课程模块给我安排学习顺序。" in output
 
 
+def test_should_show_retrieval_debug_defaults_to_false(monkeypatch):
+    monkeypatch.delenv("SHOW_RETRIEVAL_DEBUG", raising=False)
+
+    assert main.should_show_retrieval_debug() is False
+
+
+def test_should_show_retrieval_debug_accepts_true_values(monkeypatch):
+    for value in ["true", "1", "yes", "on"]:
+        monkeypatch.setenv("SHOW_RETRIEVAL_DEBUG", value)
+        assert main.should_show_retrieval_debug() is True
+
+
 def test_print_help_uses_configured_texts(monkeypatch, capsys):
     monkeypatch.setattr(
         main,

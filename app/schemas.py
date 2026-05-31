@@ -40,6 +40,7 @@ class AgentAnswer(BaseModel):
     answer: str = Field(..., description="Direct answer to the user question") # 直接回答用户的问题
     suggestions: list[str] = Field(default_factory=list, description="Follow-up study suggestions") # 后续研究建议
     sources: list[str] = Field(default_factory=list, description="Referenced document sources") # 引用的文档源
+    debug: dict = Field(default_factory=dict) # 调试字段
 
 # 切分后的检索单元
 class DocumentChunk(BaseModel):

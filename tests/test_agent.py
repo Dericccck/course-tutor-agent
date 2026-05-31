@@ -538,9 +538,9 @@ def test_ask_course_agent_triggers_retry_round_when_first_retrieval_is_weak(monk
         if len(seen_queries) <= 2:
             return [
                 RetrievedChunk(
-                    source=f"/tmp/{query}.md",
-                    title=f"{query} 标题",
-                    chunk_id=f"{query}-chunk-1",
+                    source="/tmp/shared-tool.md",
+                    title="shared tool 标题",
+                    chunk_id="shared-tool-chunk-1",
                     snippet=query,
                     score=10.0,
                     tags=["agent"],
@@ -589,16 +589,27 @@ def test_ask_course_agent_triggers_retry_round_when_first_retrieval_is_weak(monk
         question="tool use 是什么？",
         documents=[make_document()],
         settings=make_settings(),
-        memory={"recent_focus": "Tool use 与 agent tool calling"},
+        memory={},
         chunks=[make_document_chunk("04 Tool Use 学习摘要")],
     )
 
     assert seen_queries == [
         "tool use 是什么？",
         "tool use agent tool calling",
-        "Tool use 与 agent tool calling",
+        "tool use 是什么？ agent course concept",
     ]
     assert result.answer == "触发 retry 的结果"
+    assert result.debug["task_type"] == "qa"
+    assert result.debug["retry_triggered"] is True
+    assert result.debug["initial_queries"] == [
+        "tool use 是什么？",
+        "tool use agent tool calling",
+    ]
+    assert result.debug["retry_queries"] == [
+        "tool use 是什么？ agent course concept",
+    ]
+    assert result.debug["initial_result_count"] == 1
+    assert result.debug["final_result_count"] == 3
 
 
 def test_ask_course_agent_uses_document_retrieval_when_mode_is_document(monkeypatch):

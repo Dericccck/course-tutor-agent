@@ -114,6 +114,7 @@
 - `RETRIEVAL_MODE=vector` 时已支持注入 `vector_store`
 - `RETRIEVAL_MODE=hybrid` 时会合并 chunk 检索与向量检索结果
 - `RETRIEVAL_MODE=hybrid` 时会先宽召回，再按优先级与同源限制合并结果
+- 设置 `SHOW_RETRIEVAL_DEBUG=true` 后，CLI 会打印本次问答使用的初始 queries、是否触发 retry、retry queries 以及前后检索结果数量
 
 7. 向量检索链路
 - 支持通过 `build_embedding_text(...)` 统一构造 embedding 输入

@@ -1,5 +1,6 @@
 # main.py：跑程序
 # 程序入口。先负责接收一个问题，然后调用 agent.py 返回结果。
+import os
 import json
 from pathlib import Path
 from agent import ask_course_agent, detect_task_type
@@ -69,6 +70,13 @@ def print_progress(memory: dict) -> None:
 
     print()
 
+def should_show_retrieval_debug() -> bool:
+    return os.getenv("SHOW_RETRIEVAL_DEBUG", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 def print_example_questions() -> None:
     texts = load_cli_texts_config()
@@ -327,6 +335,16 @@ if __name__ == "__main__":
         print("\nSources:")
         for source in result.sources:
             print(f"- {source}")
+
+        if should_show_retrieval_debug() and result.debug:
+            print("Debug:")
+            print(f"- Task Type: {result.debug.get('task_type')}")
+            print(f"- Initial Queries: {result.debug.get('initial_queries')}")
+            print(f"- Retry Triggered: {result.debug.get('retry_triggered')}")
+            print(f"- Retry Queries: {result.debug.get('retry_queries')}")
+            print(f"- Initial Result Count: {result.debug.get('initial_result_count')}")
+            print(f"- Final Result Count: {result.debug.get('final_result_count')}")
+            print()
 
         print("\n" + "=" * 60 + "\n")
         
