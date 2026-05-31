@@ -244,6 +244,37 @@ def test_merge_multi_query_results_deduplicates_and_keeps_highest_score():
     ]
 
 
+def test_should_retry_retrieval_uses_task_specific_thresholds():
+    one_chunk = [make_chunk("04 Tool Use 学习摘要")]
+    two_chunks = [make_chunk("04 Tool Use 学习摘要"), make_chunk("05 Agentic RAG 学习摘要")]
+
+    assert agent.should_retry_retrieval([], "qa") is True
+    assert agent.should_retry_retrieval(one_chunk, "qa") is True
+    assert agent.should_retry_retrieval(two_chunks, "qa") is False
+    assert agent.should_retry_retrieval(one_chunk, "summary") is True
+    assert agent.should_retry_retrieval(two_chunks, "summary") is False
+    assert agent.should_retry_retrieval(two_chunks, "study_plan") is True
+
+
+def test_build_retry_retrieval_queries_includes_goal_scope_and_recent_focus():
+    queries = agent.build_retry_retrieval_queries(
+        "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
+        task_type="study_plan",
+        memory={
+            "learning_goal": "我想重点学习 RAG，并进一步过渡到 Agentic RAG",
+            "preferred_scope": "我只学习 1-* 和 2-* 的内容",
+            "recent_focus": "RAG 到 Agentic RAG 学习路线",
+        },
+    )
+
+    assert queries == [
+        "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？ 学习顺序 roadmap lesson",
+        "我想重点学习 RAG，并进一步过渡到 Agentic RAG",
+        "我只学习 1-* 和 2-* 的内容",
+        "RAG 到 Agentic RAG 学习路线",
+    ]
+
+
 def test_merge_retrieval_results_uses_configured_max_per_source(monkeypatch):
     monkeypatch.setattr(
         agent,
@@ -496,6 +527,78 @@ def test_ask_course_agent_runs_chunk_retrieval_for_each_query(monkeypatch):
         "tool use agent tool calling",
     ]
     assert result.answer == "chunk 多 query 检索结果"
+
+
+def test_ask_course_agent_triggers_retry_round_when_first_retrieval_is_weak(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+    seen_queries: list[str] = []
+
+    def fake_retrieve_chunks(query, chunks, top_k):
+        seen_queries.append(query)
+        if len(seen_queries) <= 2:
+            return [
+                RetrievedChunk(
+                    source=f"/tmp/{query}.md",
+                    title=f"{query} 标题",
+                    chunk_id=f"{query}-chunk-1",
+                    snippet=query,
+                    score=10.0,
+                    tags=["agent"],
+                )
+            ]
+        return [
+            RetrievedChunk(
+                source=f"/tmp/{query}.md",
+                title=f"{query} 标题",
+                chunk_id=f"{query}-chunk-1",
+                snippet=query,
+                score=9.0,
+                tags=["agent"],
+            ),
+            RetrievedChunk(
+                source=f"/tmp/{query}-extra.md",
+                title=f"{query} 扩展标题",
+                chunk_id=f"{query}-chunk-2",
+                snippet=query,
+                score=8.5,
+                tags=["agent"],
+            ),
+        ]
+
+    monkeypatch.setattr(agent, "retrieve_chunks", fake_retrieve_chunks)
+    monkeypatch.setattr(agent, "retrieve_documents", lambda query, documents, top_k: [])
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='{"answer": "触发 retry 的结果", "suggestions": [], "sources": []}'
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(),
+        memory={"recent_focus": "Tool use 与 agent tool calling"},
+        chunks=[make_document_chunk("04 Tool Use 学习摘要")],
+    )
+
+    assert seen_queries == [
+        "tool use 是什么？",
+        "tool use agent tool calling",
+        "Tool use 与 agent tool calling",
+    ]
+    assert result.answer == "触发 retry 的结果"
 
 
 def test_ask_course_agent_uses_document_retrieval_when_mode_is_document(monkeypatch):
@@ -1430,13 +1533,16 @@ def test_ask_course_agent_merges_multi_query_hybrid_results_before_rerank(monkey
     assert lexical_queries == [
         "tool use 是什么？",
         "tool use agent tool calling",
+        "tool use 是什么？ agent course concept",
     ]
     assert vector_queries == [
         "tool use 是什么？",
         "tool use agent tool calling",
+        "tool use 是什么？ agent course concept",
     ]
-    assert len(reranker.calls) == 1
+    assert len(reranker.calls) == 2
     assert len(reranker.calls[0][1]) == 4
+    assert len(reranker.calls[1][1]) == 2
     assert result.answer == "hybrid 多 query 结果"
 
 
