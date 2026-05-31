@@ -282,9 +282,10 @@ def test_build_retry_retrieval_queries_includes_goal_scope_and_recent_focus():
 
     assert queries == [
         "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？ 学习顺序 roadmap lesson",
-        "我想重点学习 RAG，并进一步过渡到 Agentic RAG",
+        "05 Agentic RAG 学习摘要",
+        "我想重点学习 RAG，并进一步过渡到 Agentic RAG 学习顺序 学习路线",
         "我只学习 1-* 和 2-* 的内容",
-        "RAG 到 Agentic RAG 学习路线",
+        "RAG 到 Agentic RAG 学习路线 学习顺序 学习路线",
     ]
 
 
@@ -612,6 +613,7 @@ def test_ask_course_agent_triggers_retry_round_when_first_retrieval_is_weak(monk
         "tool use agent tool calling",
         "04 Tool Use 学习摘要",
         "tool use 是什么？ agent course concept",
+        "04 Tool Use 学习摘要",
     ]
     assert result.answer == "触发 retry 的结果"
     assert result.debug["task_type"] == "qa"
@@ -623,9 +625,10 @@ def test_ask_course_agent_triggers_retry_round_when_first_retrieval_is_weak(monk
     ]
     assert result.debug["retry_queries"] == [
         "tool use 是什么？ agent course concept",
+        "04 Tool Use 学习摘要",
     ]
     assert result.debug["initial_result_count"] == 1
-    assert result.debug["final_result_count"] == 3
+    assert result.debug["final_result_count"] == 5
 
 
 def test_ask_course_agent_uses_document_retrieval_when_mode_is_document(monkeypatch):
@@ -1562,16 +1565,18 @@ def test_ask_course_agent_merges_multi_query_hybrid_results_before_rerank(monkey
         "tool use agent tool calling",
         "04 Tool Use 学习摘要",
         "tool use 是什么？ agent course concept",
+        "04 Tool Use 学习摘要",
     ]
     assert vector_queries == [
         "tool use 是什么？",
         "tool use agent tool calling",
         "04 Tool Use 学习摘要",
         "tool use 是什么？ agent course concept",
+        "04 Tool Use 学习摘要",
     ]
     assert len(reranker.calls) == 2
     assert len(reranker.calls[0][1]) == 5
-    assert len(reranker.calls[1][1]) == 2
+    assert len(reranker.calls[1][1]) == 4
     assert result.answer == "hybrid 多 query 结果"
 
 

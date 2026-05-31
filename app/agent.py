@@ -575,19 +575,27 @@ def detect_course_anchor(question: str) -> str | None:
 
     return None
 
-def build_retrieval_queries(
-        question: str,
-        task_type: str,
-        memory: dict | None = None
+def dedupe_queries(queries: list[str]) -> list[str]: # 去重逻辑
+    seen: set[str] = set()
+    deduped: list[str] = []
+
+    for item in queries:
+        text = item.strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        deduped.append(text)
+
+    return deduped
+
+def build_primary_queries(
+    question: str,
+    task_type: str,
+    memory: dict | None = None,
 ) -> list[str]:
-    """
-    第一轮：正常检索
-    为一次检索构造原始 query 和少量增强 query。
-    """
+    """原始问题 + 任务类型基础改写"""
     queries: list[str] = [question.strip()]
     lowered = question.lower()
-    course_anchor = detect_course_anchor(question)
-    recent_focus = (memory or {}).get("recent_focus", "").strip()
 
     if task_type == "qa":
         if "tool use" in lowered:
@@ -609,27 +617,60 @@ def build_retrieval_queries(
         else:
             queries.append(f"{question.strip()} 学习顺序 lesson roadmap")
 
-    if course_anchor:
-        queries.append(course_anchor)
-        
-    if recent_focus:# 最近在学什么
-        if task_type == "study_plan":
+    return dedupe_queries(queries)
+
+def build_anchor_queries(question: str) -> list[str]:
+    """课程标题 / lesson 锚点"""
+    course_anchor = detect_course_anchor(question)
+    if not course_anchor:
+        return []
+    return [course_anchor]
+
+def build_memory_queries(
+    task_type: str,
+    memory: dict | None = None,
+) -> list[str]:
+    """goal / scope / recent_focus"""
+    memory = memory or {}
+    goal = memory.get("learning_goal", "").strip()
+    scope = memory.get("preferred_scope", "").strip()
+    recent_focus = memory.get("recent_focus", "").strip()
+
+    queries: list[str] = []
+
+    if task_type == "study_plan":
+        if goal:
+            queries.append(f"{goal} 学习顺序 学习路线")
+        if scope:
+            queries.append(scope)
+        if recent_focus:
             queries.append(f"{recent_focus} 学习顺序 学习路线")
-        elif task_type == "summary":
+
+    elif task_type == "summary":
+        if recent_focus:
             queries.append(f"{recent_focus} lesson notebook 总结")
-        else:
+
+    else:
+        if recent_focus:
             queries.append(recent_focus)
 
-    seen: set[str] = set()
-    deduped_queries: list[str] = []
-    for item in queries:
-        text = item.strip()
-        if not text or text in seen:
-            continue
-        seen.add(text)
-        deduped_queries.append(text)
+    return dedupe_queries(queries)
 
-    return deduped_queries
+
+def build_retrieval_queries(
+        question: str,
+        task_type: str,
+        memory: dict | None = None
+) -> list[str]: # 纯组装器
+    """
+    第一轮：正常检索
+    为一次检索构造原始 query 和少量增强 query。
+    """
+    queries: list[str] = []
+    queries.extend(build_primary_queries(question, task_type, memory=memory))
+    queries.extend(build_anchor_queries(question))
+    queries.extend(build_memory_queries(task_type, memory=memory))
+    return dedupe_queries(queries)
 
 def build_retry_retrieval_queries(
         question: str,
@@ -641,9 +682,6 @@ def build_retry_retrieval_queries(
     第二轮：带更多 goal/scope/recent_focus 的补强检索
     """
     queries: list[str] = []
-    goal = (memory or {}).get("learning_goal", "").strip()
-    scope = (memory or {}).get("preferred_scope", "").strip()
-    recent_focus = (memory or {}).get("recent_focus", "").strip()
 
     if task_type == "summary":
         queries.append(f"{question.strip()} notebook lesson summary")
@@ -652,23 +690,11 @@ def build_retry_retrieval_queries(
     else:
         queries.append(f"{question.strip()} agent course concept")
 
-    if goal:
-        queries.append(goal)
-    if scope:
-        queries.append(scope)
-    if recent_focus:
-        queries.append(recent_focus)
+    queries.extend(build_anchor_queries(question))
+    queries.extend(build_memory_queries(task_type, memory=memory))
 
-    seen: set[str] = set()
-    deduped: list[str] = []
-    for item in queries:
-        text = item.strip()
-        if not text or text in seen:
-            continue
-        seen.add(text)
-        deduped.append(text)
-    
-    return deduped
+    return dedupe_queries(queries)
+
 
 def update_completed_topic(memory: dict, topic_title: str) -> None:
     # 如果 memory 里已经有 completed_topics，就拿出来, 如果没有，就先创建一个空列表
