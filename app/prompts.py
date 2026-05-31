@@ -10,6 +10,7 @@ SYSTEM_PROMPT = """你是一个课程辅导 Agent，负责基于本地课程资�
 3.回答尽量清晰、简介、适合学习场景。
 4.优先解释概念，再给学习建议。
 5.输出必须是JSON，且包含answer、suggestions、sources三个字段。
+6.sources字段只能填写你实际使用过的“引用来源”，不要填写未使用的资料。
 """
 
 def build_memory_block(memory: dict) -> str:
@@ -35,6 +36,12 @@ def build_memory_block(memory: dict) -> str:
 
     return "\n".join(lines)
 
+
+def build_source_reference(chunk: RetrievedChunk) -> str:# 构建一个来源引用字符串，格式是“source#chunk_id”，如果 chunk_id 不存在，就直接用 source。这个函数可以用来生成模型输出中的来源引用，确保它们与实际的检索结果对应起来。
+    if chunk.chunk_id:
+        return f"{chunk.source}#{chunk.chunk_id}"
+    return chunk.source
+
 # 因为检索结果本身是结构化的，但模型输入需要是文本。  结构化检索结果 -> 模型可读上下文
 def build_context_block(retrieved_chunks: list[RetrievedChunk]) -> str:
     sections: list[str] = []
@@ -43,7 +50,7 @@ def build_context_block(retrieved_chunks: list[RetrievedChunk]) -> str:
         section = (
             f"[资料 {index}]\n"
             f"标题: {chunk.title}\n"
-            f"来源: {chunk.source}\n"
+            f"引用来源: {build_source_reference(chunk)}\n"
             f"标签: {', '.join(chunk.tags) if chunk.tags else '无'}\n"
             f"相关片段: {chunk.snippet}\n"
         )
@@ -64,6 +71,11 @@ def build_user_prompt(question: str, retrieved_chunks: list[RetrievedChunk], mem
     
     相关课程资料：
     {context_block}
+
+    回答要求：
+    1.优先基于前 3 条资料回答。
+    2.如果引用资料，请在 answer 中尽量显示提到资料编号，例如[资料 1]。
+    3.sources 字段只能填写上面“引用来源”中的真实值，并且只保留你实际使用过的 1-3 条。
 
     请基于以上资料输出 JSON：
     {{
@@ -88,6 +100,11 @@ def build_summary_prompt(question: str, retrieved_chunks: list[RetrievedChunk], 
     相关课程资料：
     {content_block}
 
+    回答要求：
+    1.优先基于前 4 条资料总结。
+    2.如果引用资料，请在 answer 中尽量显式提到资料编号，例如 [资料 1]。
+    3.sources 字段只能填写上面“引用来源”中的真实值，并且只保留你实际使用过的 1-3 条。
+
     请基于以上资料输出 JSON：
     {{
         "answer": "用清晰的方式总结这节课 / 这个notebook的核心内容",
@@ -108,8 +125,8 @@ def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk
     completed_topics = memory.get("completed_topics", []) if memory else []
     remaining_titles = [chunk.title for chunk in retrieved_chunks if chunk.title not in completed_topics]
     completed_titles_in_context = [chunk.title for chunk in retrieved_chunks if chunk.title in completed_topics]
-    remaining_titles_block = "\n".join(f"- {title}" for title in remaining_titles or "- 无")
-    completed_titles_block = "\n".join(f"- {title}" for title in completed_titles_in_context or "- 无")
+    remaining_titles_block = "\n".join(f"- {title}" for title in remaining_titles or ["无"])
+    completed_titles_block = "\n".join(f"- {title}" for title in completed_titles_in_context or ["无"])
 
     allowed_titles = "\n".join(
         f"- {chunk.title}"
@@ -135,6 +152,11 @@ def build_study_plan_prompt(question: str, retrieved_chunks: list[RetrievedChunk
 
     相关课程资料：
     {context_block}
+
+    回答要求：
+    1.优先基于前 5 条资料安排学习路线。
+    2.如果引用资料，请在 answer 中尽量显式提到资料编号，例如 [资料 1]。
+    3.sources 字段只能填写上面“引用来源”中的真实值，并且只保留你实际使用过的 1-3 条。
 
     请基于以上资料输出 JSON：
     {{

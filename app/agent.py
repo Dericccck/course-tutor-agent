@@ -127,6 +127,40 @@ def merge_retrieval_results(
 
     return merged
 
+# 根据任务类型选择要放入 prompt 的检索结果数量和策略。对于总结类问题，我们可能只需要最相关的 3-4 条资料来生成高质量的总结；对于学习计划类问题，我们可能需要更多的资料来全面评估和安排学习路线；而对于一般的问答类问题，我们可能只需要最相关的 1-3 条资料来直接回答用户的问题。
+def select_prompt_chunks(task_type: str, retrieved_chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
+    limits = {
+        "qa": 3,
+        "summary": 4,
+        "study_plan": 5,
+    }
+    limit = limits.get(task_type, 3)
+    return retrieved_chunks[:limit]
+
+# 这个函数的作用是从一组 RetrievedChunk 中提取出它们的来源引用，并返回一个列表。我们通过 build_source_reference 函数把每个 chunk 转换成一个唯一的来源引用字符串，然后去重后返回。这个列表可以用来填充模型输出中的 sources 字段，确保它们与实际使用过的检索结果对应起来。
+def build_source_reference_list(chunks: list[RetrievedChunk]) -> list[str]:
+    seen: set[str] = set()
+    references: list[str] = []
+    for chunk in chunks:
+        source = format_source_reference(chunk)
+        if source in seen:
+            continue
+        seen.add(source)
+        references.append(source)
+    return references
+
+# 这个函数的作用是对模型输出中的 sources 字段进行规范化处理，确保它们只包含 allowed_sources 中的真实来源，并且去重后返回。如果模型输出中的 sources 字段包含了未使用过的来源或者重复的来源，我们就过滤掉它们，最终返回一个干净、准确的来源列表。如果过滤掉之后没有任何合法来源了，我们就返回一个 fallback_sources 作为兜底，确保最终返回给用户的答案中至少有一些合理的来源信息。
+def normalize_answer_sources(answer_sources: list[str], allowed_sources: list[str], fallback_sources: list[str]) -> list[str]:
+    allowed_set = set(allowed_sources)
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for source in answer_sources:
+        if source not in allowed_set or source in seen:
+            continue
+        seen.add(source)
+        normalized.append(source)
+    return normalized or fallback_sources
+
 def ask_course_agent(
     question: str, 
     documents: list[Document], 
@@ -202,6 +236,7 @@ def ask_course_agent(
     
     client = build_client(active_settings)
     task_type = detect_task_type(question)
+
     if task_type == "summary":
         retrieved_chunks = narrow_summary_results(
             retrieved_chunks,
@@ -209,12 +244,17 @@ def ask_course_agent(
         )
     if task_type == "study_plan":
         retrieved_chunks = post_rank_study_plan_results(question, retrieved_chunks)
+
+    prompt_chunks = select_prompt_chunks(task_type, retrieved_chunks)
+    allowed_sources = build_source_reference_list(prompt_chunks)
+    fallback_sources = allowed_sources[:3] # 最多保留前三条作为兜底来源，确保即使模型输出的 sources 字段完全不合法，我们也能返回一些合理的来源信息
+    
     if task_type == "summary":
-        user_prompt = build_summary_prompt(question, retrieved_chunks, memory=memory)
+        user_prompt = build_summary_prompt(question, prompt_chunks, memory=memory)
     elif task_type == "study_plan":
-        user_prompt = build_study_plan_prompt(question, retrieved_chunks, memory=memory)
+        user_prompt = build_study_plan_prompt(question, prompt_chunks, memory=memory)
     else:
-        user_prompt = build_user_prompt(question, retrieved_chunks, memory=memory)
+        user_prompt = build_user_prompt(question, prompt_chunks, memory=memory)
 
     if task_type == "summary" and memory is not None and retrieved_chunks:
         # 第一条通常就是最相关、最可能是这次总结目标的章节 
@@ -242,10 +282,10 @@ def ask_course_agent(
         answer = AgentAnswer(
             answer=raw_content,
             suggestions=[],
-            sources=[format_source_reference(chunk) for chunk in retrieved_chunks],
+            sources=fallback_sources,
         )
     
-    answer.sources = [format_source_reference(chunk) for chunk in retrieved_chunks]
+    answer.sources = normalize_answer_sources(answer.sources, allowed_sources=allowed_sources, fallback_sources=fallback_sources)
 
     return answer
 

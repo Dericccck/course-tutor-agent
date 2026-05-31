@@ -5,6 +5,7 @@
 # 4. 学习路线 prompt 应区分未完成模块和已完成模块
 
 from prompts import (
+    build_context_block,
     build_memory_block,
     build_study_plan_prompt,
     build_user_prompt,
@@ -12,11 +13,12 @@ from prompts import (
 from schemas import RetrievedChunk
 
 
-def make_chunk(title: str, source: str) -> RetrievedChunk:
+def make_chunk(title: str, source: str, chunk_id: str | None = None) -> RetrievedChunk:
     # 构造一个最小可用的检索结果对象，供 prompt 测试使用
     return RetrievedChunk(
         source=source,
         title=title,
+        chunk_id=chunk_id,
         snippet=f"{title} 的相关片段",
         score=10.0,
         tags=["agent"],
@@ -65,6 +67,7 @@ def test_build_user_prompt_contains_question_memory_and_context():
     assert "用户当前记忆" in prompt
     assert "学习目标" in prompt
     assert "04 Tool Use 学习摘要" in prompt
+    assert "优先基于前 3 条资料回答" in prompt
     assert "列出你实际使用的资料来源路径" in prompt
 
 
@@ -96,4 +99,19 @@ def test_build_study_plan_prompt_splits_remaining_and_completed_titles():
     assert "本次上下文中已完成的模块" in prompt
     assert "- 02 Explore Agentic Frameworks 学习摘要" in prompt
     assert "- 01 Intro To AI Agents 学习摘要" in prompt
+    assert "优先基于前 5 条资料安排学习路线" in prompt
     assert "不要把“本次上下文中已完成的模块”排成第一阶段或优先阶段" in prompt
+
+
+def test_build_context_block_renders_chunk_level_source_reference():
+    chunks = [
+        make_chunk(
+            "04 Tool Use 学习摘要",
+            "/tmp/04-tool-use/notebook-summary.md",
+            chunk_id="tool-use-chunk-1",
+        )
+    ]
+
+    context = build_context_block(chunks)
+
+    assert "引用来源: /tmp/04-tool-use/notebook-summary.md#tool-use-chunk-1" in context

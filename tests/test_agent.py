@@ -464,6 +464,109 @@ def test_ask_course_agent_uses_vector_store_when_mode_is_vector(monkeypatch):
     assert result.sources == ["/tmp/vector-source.md#vector-chunk-1"]
 
 
+def test_ask_course_agent_keeps_only_model_cited_allowed_sources(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+    monkeypatch.setattr(
+        agent,
+        "retrieve_documents",
+        lambda query, documents, top_k: [
+            make_chunk("04 Tool Use 学习摘要"),
+            make_chunk("05 Agentic RAG 学习摘要"),
+        ],
+    )
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content=json.dumps(
+                        {
+                            "answer": "回答里主要使用了前两条资料。",
+                            "suggestions": [],
+                            "sources": [
+                                "/tmp/04 Tool Use 学习摘要.md",
+                                "/tmp/不会被允许的来源.md",
+                            ],
+                        }
+                    )
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(),
+        memory={},
+    )
+
+    assert result.sources == ["/tmp/04 Tool Use 学习摘要.md"]
+
+
+def test_ask_course_agent_falls_back_to_prompt_sources_when_model_sources_invalid(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+    monkeypatch.setattr(
+        agent,
+        "retrieve_documents",
+        lambda query, documents, top_k: [
+            make_chunk("04 Tool Use 学习摘要"),
+            make_chunk("05 Agentic RAG 学习摘要"),
+        ],
+    )
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content=json.dumps(
+                        {
+                            "answer": "回答内容",
+                            "suggestions": [],
+                            "sources": ["/tmp/不存在的来源.md"],
+                        }
+                    )
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(),
+        memory={},
+    )
+
+    assert result.sources == [
+        "/tmp/04 Tool Use 学习摘要.md",
+        "/tmp/05 Agentic RAG 学习摘要.md",
+    ]
+
+
+def test_select_prompt_chunks_limits_qa_context_size():
+    chunks = [make_chunk(f"标题 {index}") for index in range(1, 6)]
+
+    selected = agent.select_prompt_chunks("qa", chunks)
+
+    assert len(selected) == 3
+    assert [item.title for item in selected] == ["标题 1", "标题 2", "标题 3"]
+
+
 def test_ask_course_agent_updates_completed_topics_for_summary_with_chunks(monkeypatch):
     # summary 场景在 chunk 检索路径下，也应把第一条标题写入 completed_topics
     monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
