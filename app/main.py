@@ -115,14 +115,34 @@ def get_next_recommended_topic(memory: dict) -> str | None:
 
 def build_recent_focus_from_question(question: str, task_type: str) -> str:
     question_text = question.strip()
+    lowered = question_text.lower()
 
     if task_type == "summary":
-        return f"最近在复习/总结：{question_text}"
+        if "05-agentic-rag" in lowered or "agentic rag" in lowered:
+            return "05 Agentic RAG 总结"
+        if "04-tool-use" in lowered or "tool use" in lowered:
+            return "04 Tool Use 总结"
+        if "07-planning-design" in lowered or "planning" in lowered:
+            return "07 Planning Design 总结"
+        return "最近在复习课程总结内容"
 
     if task_type == "study_plan":
-        return f"最近在规划学习路线：{question_text}"
+        if "rag" in lowered and "agentic rag" in lowered:
+            return "RAG 到 Agentic RAG 学习路线"
+        if "aiagent" in lowered or "agent 项目" in question_text:
+            return "AIAgent 项目学习路线"
+        return "最近在规划学习路线"
 
-    return f"最近在学习问题：{question_text}"
+    if "tool use" in lowered:
+        return "Tool use 与 agent tool calling"
+    if "agentic rag" in lowered:
+        return "Agentic RAG 基础概念"
+    if "planning" in lowered:
+        return "Planning agent 与任务拆解"
+    if "memory" in lowered:
+        return "Agent memory 基础概念"
+
+    return "最近在学习课程问答主题"
 
 def get_learning_stage(memory: dict) -> str:
     completed_topics = memory.get("completed_topics", [])

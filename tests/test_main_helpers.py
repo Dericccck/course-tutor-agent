@@ -130,7 +130,7 @@ def test_print_progress_shows_completed_topics(capsys):
             "01 Intro To AI Agents 学习摘要",
             "02 Explore Agentic Frameworks 学习摘要",
         ],
-        "recent_focus": "最近在学习问题：tool use 是什么？",
+        "recent_focus": "Tool use 与 agent tool calling",
     }
 
     main.print_progress(memory)
@@ -215,13 +215,16 @@ def test_get_learning_stage_uses_configured_stage_thresholds(monkeypatch):
 def test_build_recent_focus_from_question_formats_by_task_type():
     assert (
         main.build_recent_focus_from_question("tool use 是什么？", "qa")
-        == "最近在学习问题：tool use 是什么？"
+        == "Tool use 与 agent tool calling"
     )
     assert (
         main.build_recent_focus_from_question("帮我总结 05-agentic-rag 这一节在讲什么", "summary")
-        == "最近在复习/总结：帮我总结 05-agentic-rag 这一节在讲什么"
+        == "05 Agentic RAG 总结"
     )
     assert (
-        main.build_recent_focus_from_question("RAG 应该怎么学？", "study_plan")
-        == "最近在规划学习路线：RAG 应该怎么学？"
+        main.build_recent_focus_from_question(
+            "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
+            "study_plan",
+        )
+        == "RAG 到 Agentic RAG 学习路线"
     )

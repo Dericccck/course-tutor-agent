@@ -37,7 +37,7 @@ def test_build_memory_block_renders_memory_fields():
     memory = {
         "learning_goal": "我想做一个 AIAgent 项目",
         "preferred_scope": "我只学习 1-* 和 2-* 的内容",
-        "recent_focus": "最近在学习问题：tool use 是什么？",
+        "recent_focus": "Tool use 与 agent tool calling",
         "completed_topics": ["01 Intro To AI Agents 学习摘要"],
     }
 
@@ -46,7 +46,7 @@ def test_build_memory_block_renders_memory_fields():
     assert "学习目标" in result
     assert "学习范围" in result
     assert "最近学习重点" in result
-    assert "最近在学习问题：tool use 是什么？" in result
+    assert "Tool use 与 agent tool calling" in result
     assert "用户已完成的主题" in result
     assert "01 Intro To AI Agents 学习摘要" in result
 
@@ -56,7 +56,7 @@ def test_build_user_prompt_contains_question_memory_and_context():
     memory = {
         "learning_goal": "我想做一个 AIAgent 项目",
         "preferred_scope": "我只学习 1-* 和 2-* 的内容",
-        "recent_focus": "最近在学习问题：tool use 是什么？",
+        "recent_focus": "Tool use 与 agent tool calling",
         "completed_topics": [],
     }
     chunks = [
