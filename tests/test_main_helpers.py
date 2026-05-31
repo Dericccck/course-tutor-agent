@@ -85,6 +85,7 @@ def test_print_progress_uses_configured_messages(monkeypatch, capsys):
         "learning_goal": "",
         "preferred_scope": "",
         "completed_topics": [],
+        "recent_focus": "",
     }
 
     main.print_progress(memory)
@@ -104,6 +105,7 @@ def test_print_progress_shows_empty_state(capsys):
         "learning_goal": "",
         "preferred_scope": "",
         "completed_topics": [],
+        "recent_focus": "",
     }
 
     main.print_progress(memory)
@@ -128,6 +130,7 @@ def test_print_progress_shows_completed_topics(capsys):
             "01 Intro To AI Agents 学习摘要",
             "02 Explore Agentic Frameworks 学习摘要",
         ],
+        "recent_focus": "最近在学习问题：tool use 是什么？",
     }
 
     main.print_progress(memory)
@@ -152,6 +155,7 @@ def test_get_next_recommended_topic_returns_first_unfinished():
             "01 Intro To AI Agents 学习摘要",
             "02 Explore Agentic Frameworks 学习摘要",
         ],
+        "recent_focus": "",
     }
 
     result = main.get_next_recommended_topic(memory)
@@ -165,6 +169,7 @@ def test_get_next_recommended_topic_returns_none_when_all_finished():
         "learning_goal": "",
         "preferred_scope": "",
         "completed_topics": list(main.get_learning_sequence()),
+        "recent_focus": "",
     }
 
     result = main.get_next_recommended_topic(memory)
@@ -205,3 +210,18 @@ def test_get_learning_stage_uses_configured_stage_thresholds(monkeypatch):
     assert main.get_learning_stage({"completed_topics": ["模块 A"]}) == "阶段 1"
     assert main.get_learning_stage({"completed_topics": ["模块 A", "模块 B"]}) == "阶段 2"
     assert main.get_learning_stage({"completed_topics": ["模块 A", "模块 B", "模块 C"]}) == "阶段 3"
+
+
+def test_build_recent_focus_from_question_formats_by_task_type():
+    assert (
+        main.build_recent_focus_from_question("tool use 是什么？", "qa")
+        == "最近在学习问题：tool use 是什么？"
+    )
+    assert (
+        main.build_recent_focus_from_question("帮我总结 05-agentic-rag 这一节在讲什么", "summary")
+        == "最近在复习/总结：帮我总结 05-agentic-rag 这一节在讲什么"
+    )
+    assert (
+        main.build_recent_focus_from_question("RAG 应该怎么学？", "study_plan")
+        == "最近在规划学习路线：RAG 应该怎么学？"
+    )

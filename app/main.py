@@ -2,10 +2,10 @@
 # 程序入口。先负责接收一个问题，然后调用 agent.py 返回结果。
 import json
 from pathlib import Path
-from agent import ask_course_agent
+from agent import ask_course_agent, detect_task_type
 from config import get_settings
 from loader import load_documents, load_document_chunks
-from memory import load_user_memory, save_user_memory, build_default_memory
+from memory import load_user_memory, save_user_memory, build_default_memory, update_recent_focus
 from reranker import build_reranker
 from vector_index_service import build_vector_store_with_cache
 
@@ -112,6 +112,17 @@ def get_next_recommended_topic(memory: dict) -> str | None:
             return topic
 
     return None
+
+def build_recent_focus_from_question(question: str, task_type: str) -> str:
+    question_text = question.strip()
+
+    if task_type == "summary":
+        return f"最近在复习/总结：{question_text}"
+
+    if task_type == "study_plan":
+        return f"最近在规划学习路线：{question_text}"
+
+    return f"最近在学习问题：{question_text}"
 
 def get_learning_stage(memory: dict) -> str:
     completed_topics = memory.get("completed_topics", [])
@@ -278,6 +289,12 @@ if __name__ == "__main__":
             continue
 
         result = ask_course_agent(question, documents, settings=settings, memory=memory, chunks=chunks, vector_store=vector_store, reranker=reranker,)
+
+        # 记忆系统保存“最近在学什么”
+        task_type = detect_task_type(question)
+        recent_focus = build_recent_focus_from_question(question, task_type)
+        update_recent_focus(memory, recent_focus)
+        save_user_memory(memory)
 
         print(f"\nQuestion: {question}\n")
         print("Answer:")

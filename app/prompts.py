@@ -16,6 +16,7 @@ SYSTEM_PROMPT = """你是一个课程辅导 Agent，负责基于本地课程资�
 def build_memory_block(memory: dict) -> str:
     goal = memory.get("learning_goal", "").strip()
     scope = memory.get("preferred_scope", "").strip()
+    recent_focus = memory.get("recent_focus", "").strip()
     completed_topics = memory.get("completed_topics", [])
 
     lines: list[str] = []
@@ -25,6 +26,9 @@ def build_memory_block(memory: dict) -> str:
 
     if scope:
         lines.append(f"学习范围：{scope}")
+
+    if recent_focus:
+        lines.append(f"最近学习重点：{recent_focus}")
 
     if completed_topics:
         lines.append("用户已完成的主题：")

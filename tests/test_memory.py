@@ -17,6 +17,7 @@ def test_build_default_memory_returns_expected_structure():
         "learning_goal": "",
         "preferred_scope": "",
         "completed_topics": [],
+        "recent_focus": "",
     }
 
 
@@ -39,6 +40,7 @@ def test_save_and_load_user_memory_round_trip(monkeypatch, tmp_path: Path):
         "learning_goal": "我想做一个 AIAgent 项目",
         "preferred_scope": "我只学习 1-* 和 2-* 的内容",
         "completed_topics": ["07 Planning Design 学习摘要"],
+        "recent_focus": "最近在复习/总结：帮我总结 07-planning-design 这一节在讲什么",
     }
 
     memory.save_user_memory(payload)
@@ -56,8 +58,17 @@ def test_save_user_memory_creates_parent_directory(monkeypatch, tmp_path: Path):
         "learning_goal": "测试目标",
         "preferred_scope": "测试范围",
         "completed_topics": [],
+        "recent_focus": "",
     }
 
     memory.save_user_memory(payload)
 
     assert test_memory_file.exists()
+
+
+def test_update_recent_focus_overwrites_focus_text():
+    payload = memory.build_default_memory()
+
+    memory.update_recent_focus(payload, "最近在规划学习路线：RAG 学习顺序")
+
+    assert payload["recent_focus"] == "最近在规划学习路线：RAG 学习顺序"

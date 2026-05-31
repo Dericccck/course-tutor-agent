@@ -28,4 +28,9 @@ def build_default_memory() -> dict:
         "learning_goal": "",
         "preferred_scope": "",
         "completed_topics": [],
+        "recent_focus": "",
     }
+
+def update_recent_focus(memory: dict, focus_text: str) -> None:
+    text = focus_text.strip()
+    memory["recent_focus"] = text # 最近在学什么
