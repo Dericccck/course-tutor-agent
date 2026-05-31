@@ -161,6 +161,31 @@ def normalize_answer_sources(answer_sources: list[str], allowed_sources: list[st
         normalized.append(source)
     return normalized or fallback_sources
 
+def normalize_suggestions(
+    suggestions: list[str],
+    question: str,
+    max_items: int = 3,
+) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    question_text = question.strip()
+
+    for item in suggestions:
+        text = item.strip()
+        if not text:
+            continue
+        if text == question_text:
+            continue
+        if text in seen:
+            continue
+        seen.add(text)
+        normalized.append(text)
+
+        if len(normalized) >= max_items:
+            break
+
+    return normalized
+
 def ask_course_agent(
     question: str, 
     documents: list[Document], 
@@ -248,7 +273,7 @@ def ask_course_agent(
     prompt_chunks = select_prompt_chunks(task_type, retrieved_chunks)
     allowed_sources = build_source_reference_list(prompt_chunks)
     fallback_sources = allowed_sources[:3] # 最多保留前三条作为兜底来源，确保即使模型输出的 sources 字段完全不合法，我们也能返回一些合理的来源信息
-    
+
     if task_type == "summary":
         user_prompt = build_summary_prompt(question, prompt_chunks, memory=memory)
     elif task_type == "study_plan":
@@ -286,6 +311,7 @@ def ask_course_agent(
         )
     
     answer.sources = normalize_answer_sources(answer.sources, allowed_sources=allowed_sources, fallback_sources=fallback_sources)
+    answer.suggestions = normalize_suggestions(answer.suggestions,question=question,)
 
     return answer
 

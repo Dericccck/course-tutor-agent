@@ -567,6 +567,90 @@ def test_select_prompt_chunks_limits_qa_context_size():
     assert [item.title for item in selected] == ["标题 1", "标题 2", "标题 3"]
 
 
+def test_normalize_suggestions_deduplicates_filters_empty_and_limits_to_three():
+    result = agent.normalize_suggestions(
+        [
+            "深入学习 tool use 的调用方式",
+            "",
+            "深入学习 tool use 的调用方式",
+            "阅读 04-tool-use 相关 notebook",
+            "结合规划设计理解工具调用",
+            "额外的第四条建议",
+        ],
+        question="tool use 是什么？",
+    )
+
+    assert result == [
+        "深入学习 tool use 的调用方式",
+        "阅读 04-tool-use 相关 notebook",
+        "结合规划设计理解工具调用",
+    ]
+
+
+def test_normalize_suggestions_filters_question_text():
+    result = agent.normalize_suggestions(
+        [
+            "tool use 是什么？",
+            "阅读 04-tool-use 相关 notebook",
+        ],
+        question="tool use 是什么？",
+    )
+
+    assert result == ["阅读 04-tool-use 相关 notebook"]
+
+
+def test_ask_course_agent_normalizes_model_suggestions(monkeypatch):
+    monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
+    monkeypatch.setattr(
+        agent,
+        "retrieve_documents",
+        lambda query, documents, top_k: [make_chunk("04 Tool Use 学习摘要")],
+    )
+
+    fake_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content=json.dumps(
+                        {
+                            "answer": "正常回答",
+                            "suggestions": [
+                                "tool use 是什么？",
+                                "深入学习 tool use 的调用方式",
+                                "",
+                                "深入学习 tool use 的调用方式",
+                                "阅读 04-tool-use 相关 notebook",
+                                "结合规划设计理解工具调用",
+                            ],
+                            "sources": ["/tmp/04 Tool Use 学习摘要.md"],
+                        }
+                    )
+                )
+            )
+        ]
+    )
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            return fake_response
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=FakeCompletions()))
+    monkeypatch.setattr(agent, "build_client", lambda settings: fake_client)
+
+    result = agent.ask_course_agent(
+        question="tool use 是什么？",
+        documents=[make_document()],
+        settings=make_settings(),
+        memory={},
+    )
+
+    assert result.suggestions == [
+        "深入学习 tool use 的调用方式",
+        "阅读 04-tool-use 相关 notebook",
+        "结合规划设计理解工具调用",
+    ]
+
+
 def test_ask_course_agent_updates_completed_topics_for_summary_with_chunks(monkeypatch):
     # summary 场景在 chunk 检索路径下，也应把第一条标题写入 completed_topics
     monkeypatch.setattr(agent, "validate_settings", lambda settings: None)
