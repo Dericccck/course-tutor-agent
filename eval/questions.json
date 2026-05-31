@@ -7,6 +7,9 @@
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md"
     ],
+    "expected_sources_contains": [
+      "2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md"
+    ],
     "expected_source_group": "2-3-ai-agents-for-beginners",
     "allow_cross_document": true,
     "notes": "首条应命中 04 Tool Use，允许后续补充来自同课程组的 Agent 相关模块。"
@@ -17,6 +20,9 @@
     "tags": ["qa", "agent-course", "rag"],
     "question": "agentic rag 是什么？",
     "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md"
+    ],
+    "expected_sources_contains": [
       "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md"
     ],
     "expected_source_group": "2-3-ai-agents-for-beginners",
@@ -91,6 +97,9 @@
     "expected_primary_source_contains": [
       "2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md"
     ],
+    "expected_sources_contains": [
+      "2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md"
+    ],
     "expected_source_group": "2-3-ai-agents-for-beginners",
     "allow_cross_document": false,
     "notes": "summary 应收窄到 04 Tool Use 的同一文档 chunk。"
@@ -101,6 +110,9 @@
     "tags": ["summary", "agent-course", "rag"],
     "question": "帮我总结 05-agentic-rag 这一节在讲什么",
     "expected_primary_source_contains": [
+      "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md"
+    ],
+    "expected_sources_contains": [
       "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md"
     ],
     "expected_source_group": "2-3-ai-agents-for-beginners",
@@ -214,6 +226,11 @@
       "Lesson 1",
       "Lesson 2",
       "05 Agentic RAG"
+    ],
+    "expected_sources_contains": [
+      "2-2-BuildingAndEvaluatingAdvancedRAGApplications/L1",
+      "2-2-BuildingAndEvaluatingAdvancedRAGApplications/L2",
+      "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md"
     ],
     "forbidden_answer_contains": [
       "先学习 05 Agentic RAG"

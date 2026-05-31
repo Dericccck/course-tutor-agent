@@ -271,6 +271,28 @@ def evaluate_answer_content(sample: dict, answer_text: str) -> dict:
         "forbidden_answer_hit": forbidden_answer_hit,
     }
 
+def evalvate_answer_sources(sample: dict, answer_sources: list[str]) -> dict:
+    """评估答案中的 sources 是否包含期望的关键引用。"""
+    expected_sources_contains = sample.get("expected_sources_contains", [])
+
+    normalized_sources = [strip_chunk_id(source) for source in answer_sources]
+
+    source_hits = [
+        item for item in expected_sources_contains
+        if any(item in source for source in normalized_sources)
+    ]
+
+    source_citation_hit = (
+        len(source_hits) == len(expected_sources_contains)
+        if expected_sources_contains else None
+    )
+
+    return {
+        "expected_sources_contains": expected_sources_contains,
+        "source_hits": source_hits,
+        "source_citation_hit": source_citation_hit,
+    }
+
 
 
 def evaluate_agent_sample(sample: dict, answer_result) -> dict:
@@ -280,6 +302,8 @@ def evaluate_agent_sample(sample: dict, answer_result) -> dict:
         answer_result.sources,
     )
     answer_eval = evaluate_answer_content(sample, answer_result.answer)
+
+    source_eval = evalvate_answer_sources(sample, answer_result.sources)
     evaluated.update(
         {
             "id": sample["id"],
@@ -293,6 +317,9 @@ def evaluate_agent_sample(sample: dict, answer_result) -> dict:
             "forbidden_hits": answer_eval["forbidden_hits"],
             "expected_answer_hit": answer_eval["expected_answer_hit"],
             "forbidden_answer_hit": answer_eval["forbidden_answer_hit"],
+            "expected_sources_contains": source_eval["expected_sources_contains"],
+            "source_hits": source_eval["source_hits"],
+            "source_citation_hit": source_eval["source_citation_hit"],
         }
     )
     return evaluated
@@ -367,6 +394,13 @@ def print_agent_summary(mode: str, results: list[dict]) -> None:
     answer_hits = sum(1 for item in answer_hit_items if item["expected_answer_hit"])
     forbidden_hits = sum(1 for item in results if item["forbidden_answer_hit"])
 
+    # 来源引用指标
+    source_hit_items = [
+        item for item in results
+        if item["source_citation_hit"] is not None
+    ]
+    source_hits = sum(1 for item in source_hit_items if item["source_citation_hit"])
+
     print(f"\n=== Agent Mode: {mode} (study_plan only) ===")
     print(f"Total: {total}")
     print(f"Primary Hit: {primary_hits}/{total}")
@@ -378,6 +412,9 @@ def print_agent_summary(mode: str, results: list[dict]) -> None:
     if answer_hit_items:
         print(f"Expected Answer Hit: {answer_hits}/{len(answer_hit_items)} (越高越好)")
     print(f"Forbidden Answer Hit: {forbidden_hits}/{total} (越低越好)")
+
+    if source_hit_items:
+        print(f"Source Citation Hit: {source_hits}/{len(source_hit_items)}(越高越好)")
 
 
 def print_agent_detailed_results(mode: str, results: list[dict]) -> None:
@@ -401,6 +438,9 @@ def print_agent_detailed_results(mode: str, results: list[dict]) -> None:
         print(f"  Forbidden Answer Hit: {item['forbidden_answer_hit']}")
         if item["forbidden_hits"]: # 只有当实际命中了 forbidden_answer_contains 时，这个列表才有内容，我们才打印相关信息。
             print(f"  Forbidden Hits: {item['forbidden_hits']}")
+        if item["source_citation_hit"] is not None:
+            print(f"  Source Citation Hit: {item['source_citation_hit']}")
+            print(f"  Source Hits: {item['source_hits']}")
         print(f"  Answer Preview: {item['answer_preview']}")
         print("  Sources:")
         for source in item["sources"]:

@@ -139,3 +139,35 @@ def test_is_tag_enabled_for_sample_matches_on_intersection():
     assert run_eval.is_tag_enabled_for_sample(sample, {"rag"}) is True
     assert run_eval.is_tag_enabled_for_sample(sample, {"study_plan", "summary"}) is True
     assert run_eval.is_tag_enabled_for_sample(sample, {"qa"}) is False
+
+
+def test_evalvate_answer_sources_matches_expected_source_fragments():
+    run_eval = load_run_eval_module()
+    sample = {
+        "expected_sources_contains": [
+            "2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md",
+            "2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md",
+        ]
+    }
+    answer_sources = [
+        "/Users/a1-6/Desktop/AIAgent/code/2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md#chunk-1",
+        "/Users/a1-6/Desktop/AIAgent/code/2-3-ai-agents-for-beginners/05-agentic-rag/notebook-summary.md#chunk-2",
+    ]
+
+    result = run_eval.evalvate_answer_sources(sample, answer_sources)
+
+    assert result["source_citation_hit"] is True
+    assert result["source_hits"] == sample["expected_sources_contains"]
+
+
+def test_evalvate_answer_sources_returns_none_when_not_configured():
+    run_eval = load_run_eval_module()
+
+    result = run_eval.evalvate_answer_sources(
+        {"id": "sample-without-source-expectation"},
+        ["/tmp/example.md#chunk-1"],
+    )
+
+    assert result["expected_sources_contains"] == []
+    assert result["source_hits"] == []
+    assert result["source_citation_hit"] is None

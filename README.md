@@ -201,6 +201,9 @@
 - `eval/questions.json` 里的单条样本还支持通过 `tags` 做标签分组：
   - 例如：`"tags": ["study_plan", "rag"]`
   - 方便只跑某一类评估题，而不必每次都跑整套样本
+- `eval/questions.json` 里的单条样本还支持通过 `expected_sources_contains` 约束答案引用：
+  - 例如：`"expected_sources_contains": ["2-3-ai-agents-for-beginners/04-tool-use/notebook-summary.md"]`
+  - 用于检查最终回答里的 `sources` 是否真的覆盖了期望引用
 - `eval/run_eval.py` 支持通过 `EVAL_TAGS` 筛选样本标签：
   - `EVAL_TAGS=study_plan`
   - 只跑带 `study_plan` 标签的样本
@@ -213,6 +216,9 @@
 - 对 `study_plan` 场景，主评估指标为：
   - `Expected Answer Hit`
   - `Forbidden Answer Hit`
+- grounding / citation 相关的答案级指标还包括：
+  - `Source Citation Hit`
+  - 用于检查最终答案返回的 `sources` 是否命中了题目配置的关键引用来源
 - `Primary Hit` 在带 memory 的学习路线问题中仅作为参考，不再是主指标
 
 10. 向量索引持久化
