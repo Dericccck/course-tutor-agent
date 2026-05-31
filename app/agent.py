@@ -537,6 +537,44 @@ def detect_task_type(question: str) -> str:
 
     return "qa"
 
+def detect_course_anchor(question: str) -> str | None:
+    """
+    加课程标题 / lesson 锚点感知。
+
+    目标：
+        如果问题里已经包含课程模块名/lesson 名
+        就优先生成一个“课程锚点 query”
+        让检索更容易命中对应 notebook/lesson
+        这比现在只看 tool use / planning / memory / rag 更贴课程语料。
+    """
+    lowered = question.lower()
+
+    if "04-tool-use" in lowered or "tool use" in lowered:
+        return "04 Tool Use 学习摘要"
+
+    if "05-agentic-rag" in lowered or "agentic rag" in lowered:
+        return "05 Agentic RAG 学习摘要"
+
+    if "07-planning-design" in lowered or "planning" in lowered:
+        return "07 Planning Design 学习摘要"
+
+    if "08-multi-agent" in lowered or "multi agent" in lowered:
+        return "08 Multi Agent 学习摘要"
+
+    if "09-metacognition" in lowered or "metacognition" in lowered:
+        return "09 Metacognition 学习摘要"
+
+    if "13-agent-memory" in lowered or "agent memory" in lowered:
+        return "13 Agent Memory 学习摘要"
+
+    if "lesson 1" in lowered:
+        return "Lesson 1 学习摘要"
+
+    if "lesson 2" in lowered:
+        return "Lesson 2 学习摘要"
+
+    return None
+
 def build_retrieval_queries(
         question: str,
         task_type: str,
@@ -548,6 +586,7 @@ def build_retrieval_queries(
     """
     queries: list[str] = [question.strip()]
     lowered = question.lower()
+    course_anchor = detect_course_anchor(question)
     recent_focus = (memory or {}).get("recent_focus", "").strip()
 
     if task_type == "qa":
@@ -570,6 +609,9 @@ def build_retrieval_queries(
         else:
             queries.append(f"{question.strip()} 学习顺序 lesson roadmap")
 
+    if course_anchor:
+        queries.append(course_anchor)
+        
     if recent_focus:# 最近在学什么
         if task_type == "study_plan":
             queries.append(f"{recent_focus} 学习顺序 学习路线")

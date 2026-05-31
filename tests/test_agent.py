@@ -143,6 +143,7 @@ def test_build_retrieval_queries_adds_rule_based_qa_expansion():
     assert queries == [
         "tool use 是什么？",
         "tool use agent tool calling",
+        "04 Tool Use 学习摘要",
     ]
 
 
@@ -156,6 +157,7 @@ def test_build_retrieval_queries_includes_recent_focus_for_qa():
     assert queries == [
         "tool use 是什么？",
         "tool use agent tool calling",
+        "04 Tool Use 学习摘要",
         "Tool use 与 agent tool calling",
     ]
 
@@ -170,6 +172,7 @@ def test_build_retrieval_queries_adds_study_plan_goal_expansion():
     assert queries == [
         "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
         "我想重点学习 RAG，并进一步过渡到 Agentic RAG 学习顺序 学习路线",
+        "05 Agentic RAG 学习摘要",
     ]
 
 
@@ -183,6 +186,7 @@ def test_build_retrieval_queries_includes_recent_focus_for_summary():
     assert queries == [
         "帮我总结 05-agentic-rag 这一节在讲什么",
         "帮我总结 05-agentic-rag 这一节在讲什么 notebook lesson 总结",
+        "05 Agentic RAG 学习摘要",
         "05 Agentic RAG 总结 lesson notebook 总结",
     ]
 
@@ -200,8 +204,17 @@ def test_build_retrieval_queries_includes_recent_focus_for_study_plan():
     assert queries == [
         "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
         "我想重点学习 RAG，并进一步过渡到 Agentic RAG 学习顺序 学习路线",
+        "05 Agentic RAG 学习摘要",
         "RAG 到 Agentic RAG 学习路线 学习顺序 学习路线",
     ]
+
+
+def test_detect_course_anchor_maps_known_course_titles():
+    assert agent.detect_course_anchor("tool use 是什么？") == "04 Tool Use 学习摘要"
+    assert agent.detect_course_anchor("帮我总结 05-agentic-rag 这一节在讲什么") == "05 Agentic RAG 学习摘要"
+    assert agent.detect_course_anchor("planning agent 是什么？") == "07 Planning Design 学习摘要"
+    assert agent.detect_course_anchor("Lesson 1 在讲什么") == "Lesson 1 学习摘要"
+    assert agent.detect_course_anchor("一个完全无关的问题") is None
 
 
 def test_merge_multi_query_results_deduplicates_and_keeps_highest_score():
@@ -525,6 +538,7 @@ def test_ask_course_agent_runs_chunk_retrieval_for_each_query(monkeypatch):
     assert seen_queries == [
         "tool use 是什么？",
         "tool use agent tool calling",
+        "04 Tool Use 学习摘要",
     ]
     assert result.answer == "chunk 多 query 检索结果"
 
@@ -535,7 +549,7 @@ def test_ask_course_agent_triggers_retry_round_when_first_retrieval_is_weak(monk
 
     def fake_retrieve_chunks(query, chunks, top_k):
         seen_queries.append(query)
-        if len(seen_queries) <= 2:
+        if len(seen_queries) <= 3:
             return [
                 RetrievedChunk(
                     source="/tmp/shared-tool.md",
@@ -596,6 +610,7 @@ def test_ask_course_agent_triggers_retry_round_when_first_retrieval_is_weak(monk
     assert seen_queries == [
         "tool use 是什么？",
         "tool use agent tool calling",
+        "04 Tool Use 学习摘要",
         "tool use 是什么？ agent course concept",
     ]
     assert result.answer == "触发 retry 的结果"
@@ -604,6 +619,7 @@ def test_ask_course_agent_triggers_retry_round_when_first_retrieval_is_weak(monk
     assert result.debug["initial_queries"] == [
         "tool use 是什么？",
         "tool use agent tool calling",
+        "04 Tool Use 学习摘要",
     ]
     assert result.debug["retry_queries"] == [
         "tool use 是什么？ agent course concept",
@@ -1544,15 +1560,17 @@ def test_ask_course_agent_merges_multi_query_hybrid_results_before_rerank(monkey
     assert lexical_queries == [
         "tool use 是什么？",
         "tool use agent tool calling",
+        "04 Tool Use 学习摘要",
         "tool use 是什么？ agent course concept",
     ]
     assert vector_queries == [
         "tool use 是什么？",
         "tool use agent tool calling",
+        "04 Tool Use 学习摘要",
         "tool use 是什么？ agent course concept",
     ]
     assert len(reranker.calls) == 2
-    assert len(reranker.calls[0][1]) == 4
+    assert len(reranker.calls[0][1]) == 5
     assert len(reranker.calls[1][1]) == 2
     assert result.answer == "hybrid 多 query 结果"
 
@@ -1621,8 +1639,8 @@ def test_ask_course_agent_uses_configured_hybrid_candidate_pool(monkeypatch):
         vector_store=FakeVectorStore(),
     )
 
-    assert lexical_top_ks == [20, 20]
-    assert vector_top_ks == [20, 20]
+    assert lexical_top_ks == [20, 20, 20]
+    assert vector_top_ks == [20, 20, 20]
     assert result.answer == "hybrid 候选池结果"
 
 

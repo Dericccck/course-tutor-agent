@@ -110,6 +110,7 @@
 - 可通过 `RETRIEVAL_MODE` 切回整篇文档检索
 - 保留整篇文档检索作为 fallback
 - 首次检索已支持规则型 multi-query 扩展：保留原始问题，并为 `qa / summary / study_plan` 补少量增强 query 后再合并结果
+- query rewrite v2 已支持课程标题 / lesson 锚点感知，会把 `04-tool-use`、`05-agentic-rag`、`Lesson 1` 等课程标识转成显式检索锚点
 - 当首次检索结果过弱时，主流程会自动触发第二轮补强检索，并引入 `learning_goal / preferred_scope / recent_focus` 作为补充 query
 - `RETRIEVAL_MODE=vector` 时已支持注入 `vector_store`
 - `RETRIEVAL_MODE=hybrid` 时会合并 chunk 检索与向量检索结果
