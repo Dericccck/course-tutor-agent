@@ -686,6 +686,8 @@ def build_memory_queries(
     goal = memory.get("learning_goal", "").strip()
     scope = memory.get("preferred_scope", "").strip()
     recent_focus = memory.get("recent_focus", "").strip()
+    recent_focus_history = memory.get("recent_focus_history", [])
+    recent_focus_tail = recent_focus_history[-2:]
 
     queries: list[str] = []
 
@@ -696,14 +698,19 @@ def build_memory_queries(
             queries.append(scope)
         if recent_focus:
             queries.append(f"{recent_focus} 学习顺序 学习路线")
+        for item in recent_focus_tail:
+            queries.append(f"{item} 学习顺序 学习路线")
 
     elif task_type == "summary":
         if recent_focus:
             queries.append(f"{recent_focus} lesson notebook 总结")
+        for item in recent_focus_tail:
+            queries.append(f"{item} lesson notebook 总结")
 
     else:
         if recent_focus:
             queries.append(recent_focus)
+        queries.extend(recent_focus_tail)
 
     return dedupe_queries(queries)
 

@@ -68,6 +68,10 @@ def print_progress(memory: dict) -> None:
             f"{progress_texts.get('next_topic_when_complete', '当前主学习路线已全部完成，可以开始复习或扩展新主题。')}"
         )
 
+    recent_focus_history = memory.get("recent_focus_history", [])
+    if recent_focus_history:
+        print(f"- 最近学习轨迹: {' -> '.join(recent_focus_history)}")# 显示最近的学习轨迹，帮助用户回顾学习路径和调整学习计划
+
     print()
 
 def should_show_retrieval_debug() -> bool:

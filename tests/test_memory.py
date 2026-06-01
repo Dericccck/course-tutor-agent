@@ -18,6 +18,7 @@ def test_build_default_memory_returns_expected_structure():
         "preferred_scope": "",
         "completed_topics": [],
         "recent_focus": "",
+        "recent_focus_history": [],
     }
 
 
@@ -41,6 +42,7 @@ def test_save_and_load_user_memory_round_trip(monkeypatch, tmp_path: Path):
         "preferred_scope": "我只学习 1-* 和 2-* 的内容",
         "completed_topics": ["07 Planning Design 学习摘要"],
         "recent_focus": "最近在复习/总结：帮我总结 07-planning-design 这一节在讲什么",
+        "recent_focus_history": ["07 Planning Design 总结"],
     }
 
     memory.save_user_memory(payload)
@@ -59,6 +61,7 @@ def test_save_user_memory_creates_parent_directory(monkeypatch, tmp_path: Path):
         "preferred_scope": "测试范围",
         "completed_topics": [],
         "recent_focus": "",
+        "recent_focus_history": [],
     }
 
     memory.save_user_memory(payload)
@@ -72,3 +75,20 @@ def test_update_recent_focus_overwrites_focus_text():
     memory.update_recent_focus(payload, "最近在规划学习路线：RAG 学习顺序")
 
     assert payload["recent_focus"] == "最近在规划学习路线：RAG 学习顺序"
+    assert payload["recent_focus_history"] == ["最近在规划学习路线：RAG 学习顺序"]
+
+
+def test_update_recent_focus_keeps_recent_history_tail():
+    payload = memory.build_default_memory()
+
+    memory.update_recent_focus(payload, "Tool use 与 agent tool calling")
+    memory.update_recent_focus(payload, "05 Agentic RAG 总结")
+    memory.update_recent_focus(payload, "RAG 到 Agentic RAG 学习路线")
+    memory.update_recent_focus(payload, "Planning agent 与任务拆解")
+
+    assert payload["recent_focus"] == "Planning agent 与任务拆解"
+    assert payload["recent_focus_history"] == [
+        "05 Agentic RAG 总结",
+        "RAG 到 Agentic RAG 学习路线",
+        "Planning agent 与任务拆解",
+    ]

@@ -294,9 +294,11 @@
   - `preferred_scope`
   - `completed_topics`
   - `recent_focus`
+  - `recent_focus_history`
 - 在回答时把用户目标和学习范围一并带入 prompt
 - 在回答时会把“最近学习重点”一并带入 prompt，帮助回答围绕最近学习上下文展开
 - `recent_focus` 当前优先保存为简短主题摘要，而不是直接保存整句用户问题
+- `recent_focus_history` 当前会保留最近 3 个学习主题，并在 prompt / retrieval 中优先使用最近 2-3 个主题作为连续学习上下文
 - `recent_focus` 当前还会参与补充检索 query，帮助连续学习场景下的检索更稳定
 - 在执行章节总结后自动记录已完成主题
 - 在生成学习顺序建议时，优先参考未完成模块并尽量避开重复推荐已完成主题

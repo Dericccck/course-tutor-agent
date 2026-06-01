@@ -29,8 +29,20 @@ def build_default_memory() -> dict:
         "preferred_scope": "",
         "completed_topics": [],
         "recent_focus": "",
+        "recent_focus_history": [],
     }
 
 def update_recent_focus(memory: dict, focus_text: str) -> None:
+    """
+    更新用户的最近关注点
+    """
     text = focus_text.strip()
+    if not text:
+        return
+    
     memory["recent_focus"] = text # 最近在学什么
+
+    history = memory.setdefault("recent_focus_history", [])
+    history = [item for item in history if item != text] # 去重
+    history.append(text) # 插入到最前面
+    memory["recent_focus_history"] = history[-3:] # 保留最近 3 条

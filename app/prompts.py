@@ -17,6 +17,7 @@ def build_memory_block(memory: dict) -> str:
     goal = memory.get("learning_goal", "").strip()
     scope = memory.get("preferred_scope", "").strip()
     recent_focus = memory.get("recent_focus", "").strip()
+    recent_focus_history = memory.get("recent_focus_history", [])
     completed_topics = memory.get("completed_topics", [])
 
     lines: list[str] = []
@@ -29,6 +30,10 @@ def build_memory_block(memory: dict) -> str:
 
     if recent_focus:
         lines.append(f"最近学习重点：{recent_focus}")
+    
+    if recent_focus_history:
+        history_block = "；".join(recent_focus_history[-3:])  # 只保留最近 3 条
+        lines.append(f"最近学习轨迹：{history_block}")
 
     if completed_topics:
         lines.append("用户已完成的主题：")
