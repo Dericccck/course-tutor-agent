@@ -261,12 +261,25 @@ def test_should_retry_retrieval_uses_task_specific_thresholds():
     one_chunk = [make_chunk("04 Tool Use 学习摘要")]
     two_chunks = [make_chunk("04 Tool Use 学习摘要"), make_chunk("05 Agentic RAG 学习摘要")]
 
-    assert agent.should_retry_retrieval([], "qa") is True
-    assert agent.should_retry_retrieval(one_chunk, "qa") is True
-    assert agent.should_retry_retrieval(two_chunks, "qa") is False
-    assert agent.should_retry_retrieval(one_chunk, "summary") is True
-    assert agent.should_retry_retrieval(two_chunks, "summary") is False
-    assert agent.should_retry_retrieval(two_chunks, "study_plan") is True
+    assert agent.should_retry_retrieval("tool use 是什么？", [], "qa") is True
+    assert agent.should_retry_retrieval("tool use 是什么？", one_chunk, "qa") is True
+    assert agent.should_retry_retrieval("tool use 是什么？", two_chunks, "qa") is False
+    assert agent.should_retry_retrieval("帮我总结 07-planning-design 这一节在讲什么", one_chunk, "summary") is True
+    assert agent.should_retry_retrieval("帮我总结 07-planning-design 这一节在讲什么", two_chunks, "summary") is False
+    assert agent.should_retry_retrieval("如果我想重点学 RAG，应该怎么安排学习顺序？", two_chunks, "study_plan") is True
+
+
+def test_should_retry_retrieval_treats_generic_summary_without_anchor_as_weak():
+    two_chunks = [make_chunk("04 Tool Use 学习摘要"), make_chunk("05 Agentic RAG 学习摘要")]
+
+    assert agent.should_retry_retrieval("帮我总结这节课", two_chunks, "summary") is True
+    assert agent.should_retry_retrieval("帮我总结这个notebook", two_chunks, "summary") is True
+
+
+def test_is_generic_summary_question_matches_broad_summary_patterns():
+    assert agent.is_generic_summary_question("帮我总结这节课") is True
+    assert agent.is_generic_summary_question("总结这个notebook") is True
+    assert agent.is_generic_summary_question("帮我总结 05-agentic-rag 这一节在讲什么") is True
 
 
 def test_build_retry_retrieval_queries_includes_goal_scope_and_recent_focus():

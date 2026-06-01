@@ -148,21 +148,27 @@ def merge_multi_query_results(
     return merged[:top_k]
 
 def should_retry_retrieval(
+        question: str,
         retrieved_chunks: list[RetrievedChunk],
         task_type: str,
 ) -> bool:
     """
-    判断结果是否弱
-    弱的话，做第二轮更强检索
-        qa 少于 2 条就算弱
-        summary 少于 2 条就算弱
-        study_plan 少于 3 条就算弱
+    判断是否需要重试检索
+    目标：
+        1. 如果第一次检索完全没有结果了，那肯定要重试，直接放大招了。
+        2. 如果是总结类问题，但检索结果太少了（比如少于 2 条），那也要重试，因为总结类问题通常需要更多的上下文信息来生成高质量的总结。
+        3. 如果是学习计划类问题，但检索结果太少了（比如少于 3 条），那也要重试，因为学习计划类问题通常需要更全面的资料来评估和安排学习路线。
+        4. 对于一般的问答类问题，如果检索结果太少了（比如少于 2 条），那也要重试，因为可能需要更多的相关信息来准确回答用户的问题。
     """
     if not retrieved_chunks:
         return True
     
     if task_type == "summary":
-        return len(retrieved_chunks) < 2
+        if len(retrieved_chunks) < 2:
+            return True
+        if is_generic_summary_question(question) and detect_course_anchor(question) is None:
+            return True
+        return False
     
     if task_type == "study_plan":
         return len(retrieved_chunks) < 3
@@ -276,7 +282,7 @@ def ask_course_agent(
 
     client = build_client(active_settings)
 
-    if should_retry_retrieval(retrieved_chunks, task_type):# 弱的话，做第二轮更强检索
+    if should_retry_retrieval(question, retrieved_chunks, task_type):# 弱的话，做第二轮更强检索
         debug_info["retry_triggered"] = True
 
         retry_queries = build_retry_retrieval_queries(
@@ -596,6 +602,29 @@ def detect_course_anchor(question: str) -> str | None:
         return "Lesson 2 学习摘要"
 
     return None
+
+def is_generic_summary_question(question: str) -> bool:
+    """
+    判断是否是泛泛的总结类问题。
+
+    目标：
+        如果用户的问题里没有明确指向某个课程模块的关键词
+        就认为是一个泛泛的总结类问题
+        这时候我们就不强制加课程锚点了
+        避免反而把检索引导到不相关的课程模块上去。
+    """
+    lowered = question.lower()
+    generic_patterns = [
+        "总结",
+        "概述",
+        "概要",
+        "讲什么",
+        "这一节",
+        "这节课",
+        "notebook",
+        "lesson",
+    ]
+    return any(pattern in lowered for pattern in generic_patterns)
 
 def dedupe_queries(queries: list[str]) -> list[str]: # 去重逻辑
     seen: set[str] = set()

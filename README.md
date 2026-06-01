@@ -114,6 +114,7 @@
 - query 构造已进一步分层为 `primary queries / anchor queries / memory queries / retry queries`，便于后续继续接 LLM rewrite、structured trace 和 tracing 平台
 - 当首次检索结果过弱时，主流程会自动触发第二轮补强检索，并引入 `learning_goal / preferred_scope / recent_focus` 作为补充 query
 - retry 路径已支持 `LLM rewrite v1`：仅在弱检索补强阶段额外生成 1 条 LLM query；如果 rewrite 失败或返回 JSON/无效内容，会静默降级为规则型 retry
+- retrieval retry v3 已开始使用“数量 + 弱信号”触发：对于 `帮我总结这节课`、`总结这个notebook` 这类没有课程锚点的泛 summary 问题，即使首轮结果数量足够，也会触发第二轮补强检索
 - `RETRIEVAL_MODE=vector` 时已支持注入 `vector_store`
 - `RETRIEVAL_MODE=hybrid` 时会合并 chunk 检索与向量检索结果
 - `RETRIEVAL_MODE=hybrid` 时会先宽召回，再按优先级与同源限制合并结果
