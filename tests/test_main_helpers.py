@@ -4,6 +4,9 @@
 # 3. 学习进度摘要应正确展示空状态和有进度状态
 # 4. 学习进度摘要应给出下一步推荐主题
 
+import json
+from types import SimpleNamespace
+
 import main
 
 
@@ -49,6 +52,53 @@ def test_should_show_retrieval_debug_accepts_true_values(monkeypatch):
     for value in ["true", "1", "yes", "on"]:
         monkeypatch.setenv("SHOW_RETRIEVAL_DEBUG", value)
         assert main.should_show_retrieval_debug() is True
+
+
+def test_append_retrieval_trace_writes_jsonl_record(tmp_path):
+    trace_path = tmp_path / "retrieval_traces.jsonl"
+    result = SimpleNamespace(
+        answer="tool use 是指 Agent 调用外部工具。",
+        sources=["/tmp/tool.md#tool-1"],
+        debug={
+            "task_type": "qa",
+            "initial_queries": ["tool use 是什么？"],
+            "retry_triggered": False,
+            "retry_queries": [],
+            "llm_retry_query": None,
+            "initial_result_count": 3,
+            "final_result_count": 3,
+            "final_sources": ["/tmp/tool.md#tool-1"],
+            "memory_snapshot": {
+                "learning_goal": "",
+                "preferred_scope": "",
+                "recent_focus": "Tool use 与 agent tool calling",
+                "recent_focus_history": ["Tool use 与 agent tool calling"],
+            },
+        },
+    )
+
+    main.append_retrieval_trace(str(trace_path), "tool use 是什么？", result)
+
+    lines = trace_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+
+    payload = json.loads(lines[0])
+    assert payload["question"] == "tool use 是什么？"
+    assert payload["answer_preview"] == "tool use 是指 Agent 调用外部工具。"
+    assert payload["sources"] == ["/tmp/tool.md#tool-1"]
+    assert payload["debug"]["task_type"] == "qa"
+    assert payload["debug"]["memory_snapshot"]["recent_focus_history"] == [
+        "Tool use 与 agent tool calling"
+    ]
+
+
+def test_append_retrieval_trace_skips_when_debug_missing(tmp_path):
+    trace_path = tmp_path / "retrieval_traces.jsonl"
+    result = SimpleNamespace(answer="answer", sources=[], debug={})
+
+    main.append_retrieval_trace(str(trace_path), "tool use 是什么？", result)
+
+    assert trace_path.exists() is False
 
 
 def test_print_help_uses_configured_texts(monkeypatch, capsys):

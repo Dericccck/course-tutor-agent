@@ -1,6 +1,7 @@
 # main.py：跑程序
 # 程序入口。先负责接收一个问题，然后调用 agent.py 返回结果。
 import os
+from datetime import datetime
 import json
 from pathlib import Path
 from agent import ask_course_agent, detect_task_type
@@ -73,6 +74,27 @@ def print_progress(memory: dict) -> None:
         print(f"- 最近学习轨迹: {' -> '.join(recent_focus_history)}")# 显示最近的学习轨迹，帮助用户回顾学习路径和调整学习计划
 
     print()
+
+def append_retrieval_trace(trace_path: str | None, question: str, result) -> None:
+    """
+    如果配置了 trace 路径，并且结果里包含 debug 信息，就把这次检索的相关信息追加写入到 trace 文件里，方便后续分析和调试。
+    """
+    if not trace_path or not getattr(result, "debug", None):# 如果没有配置 trace 路径，或者结果里没有 debug 信息，就不记录了，避免无谓的文件写入和性能开销。
+        return
+    
+    path = Path(trace_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "question": question,
+        "answer_preview": result.answer[:200],
+        "sources": result.sources,
+        "debug": result.debug,
+    }
+
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 def should_show_retrieval_debug() -> bool:
     return os.getenv("SHOW_RETRIEVAL_DEBUG", "false").strip().lower() in {
@@ -327,6 +349,16 @@ if __name__ == "__main__":
         recent_focus = build_recent_focus_from_question(question, task_type)
         update_recent_focus(memory, recent_focus)
         save_user_memory(memory)
+
+        # 追加写入检索 trace，方便后续分析和调试
+        try:
+            append_retrieval_trace(
+                settings.retrieval_trace_path,
+                question,
+                result,
+            )
+        except Exception as e:
+            print(f"[trace warning] {e}")
 
         print(f"\nQuestion: {question}\n")
         print("Answer:")

@@ -268,6 +268,8 @@ def ask_course_agent(
         "llm_retry_query": None,
         "initial_result_count": 0,
         "final_result_count": 0,
+        "final_sources": [],
+        "memory_snapshot": {},
     }
 
     retrieved_chunks = run_retrieval_round(
@@ -403,6 +405,13 @@ def ask_course_agent(
         allowed_sources=allowed_sources,
         fallback_sources=fallback_sources,
     )
+    debug_info["final_sources"] = [format_source_reference(chunk) for chunk in retrieved_chunks]
+    debug_info["memory_snapshot"] = {
+        "learning_goal": (memory or {}).get("learning_goal", ""),
+        "preferred_scope": (memory or {}).get("preferred_scope", ""),
+        "recent_focus": (memory or {}).get("recent_focus", ""),
+        "recent_focus_history": (memory or {}).get("recent_focus_history", []),
+    }
     answer.debug = debug_info
 
     return answer

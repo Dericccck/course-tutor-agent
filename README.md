@@ -120,6 +120,8 @@
 - `RETRIEVAL_MODE=hybrid` 时会先宽召回，再按优先级与同源限制合并结果
 - 设置 `SHOW_RETRIEVAL_DEBUG=true` 后，CLI 会打印本次问答使用的初始 queries、是否触发 retry、retry queries 以及前后检索结果数量
 - 当存在 LLM 补强 query 时，CLI debug 还会额外打印 `LLM Retry Query`
+- 现在已支持把检索 debug 以结构化 JSONL 形式追加写入 `RETRIEVAL_TRACE_PATH`，默认落盘到 `data/retrieval_traces.jsonl`
+- 每条 trace 当前会记录 `question / answer_preview / sources / initial_queries / retry_queries / llm_retry_query / result_count / memory_snapshot`
 
 7. 向量检索链路
 - 支持通过 `build_embedding_text(...)` 统一构造 embedding 输入

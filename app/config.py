@@ -19,6 +19,7 @@ class RetrievalSettings: # 这个类用来专门存储检索相关的配置项�
     reranker_provider: str
     reranker_model_name: str
     reranker_cache_dir: str | None
+    retrieval_trace_path: str | None
 
 @dataclass
 class Settings:
@@ -57,6 +58,11 @@ def get_settings() -> Settings:
     reranker_model_name = os.getenv("RERANKER_MODEL_NAME", "BAAI/bge-reranker-base").strip()
     reranker_cache_dir = os.getenv("RERANKER_CACHE_DIR", "").strip() or embedding_cache_dir
 
+    retrieval_trace_path = os.getenv(
+        "RETRIEVAL_TRACE_PATH",
+        "/Users/a1-6/Desktop/AIAgent/05-project/course-tutor-agent/data/retrieval_traces.jsonl",
+    ).strip() or None
+
     if llm_provider == "github":
         api_key = os.getenv("GITHUB_TOKEN", "").strip()
         base_url = os.getenv(
@@ -87,6 +93,7 @@ def get_settings() -> Settings:
             reranker_provider=reranker_provider,
             reranker_model_name=reranker_model_name,
             reranker_cache_dir=reranker_cache_dir,
+            retrieval_trace_path=retrieval_trace_path,
         ),
     )
 
