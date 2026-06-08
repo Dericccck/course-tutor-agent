@@ -19,7 +19,7 @@ class RetrievalSettings: # 这个类用来专门存储检索相关的配置项�
     reranker_provider: str
     reranker_model_name: str
     reranker_cache_dir: str | None
-    retrieval_trace_path: str | None
+    
 
 @dataclass
 class Settings:
@@ -31,6 +31,7 @@ class Settings:
     course_include_dirs: list[str] # 通过环境变量配置一些特定的子目录，来让检索更聚焦一些。比如只检索“课程内容”相关的文档，而不检索“项目实战”相关的文档。(扫描的文件目录白名单)
     vector_index_cache_path: str | None # 这个字段可以用来指定一个本地文件路径，用于缓存整个向量索引的数据结构。这样在后续的使用中，我们就可以直接从这个缓存文件中加载向量索引，而不需要重新计算所有 chunks 的向量表示，进一步提升启动速度。
     retrieval: RetrievalSettings
+    retrieval_trace_path: str | None
 
 
 def get_settings() -> Settings:
@@ -93,8 +94,8 @@ def get_settings() -> Settings:
             reranker_provider=reranker_provider,
             reranker_model_name=reranker_model_name,
             reranker_cache_dir=reranker_cache_dir,
-            retrieval_trace_path=retrieval_trace_path,
         ),
+        retrieval_trace_path=retrieval_trace_path,
     )
 
 

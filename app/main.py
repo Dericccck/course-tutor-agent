@@ -79,6 +79,9 @@ def append_retrieval_trace(trace_path: str | None, question: str, result) -> Non
     """
     如果配置了 trace 路径，并且结果里包含 debug 信息，就把这次检索的相关信息追加写入到 trace 文件里，方便后续分析和调试。
     """
+    print(f"[trace] trace_path: {trace_path}")
+    print(f"[trace] question: {question}")
+    print(f"[trace] result: {result}")
     if not trace_path or not getattr(result, "debug", None):# 如果没有配置 trace 路径，或者结果里没有 debug 信息，就不记录了，避免无谓的文件写入和性能开销。
         return
     
