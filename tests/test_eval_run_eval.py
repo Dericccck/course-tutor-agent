@@ -1,5 +1,7 @@
 import importlib.util
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 
 RUN_EVAL_PATH = (
@@ -105,6 +107,21 @@ def test_get_eval_tags_uses_config_default(monkeypatch):
     assert run_eval.get_eval_tags() == {"study_plan", "rag"}
 
 
+def test_should_write_eval_traces_defaults_to_true(monkeypatch):
+    monkeypatch.delenv("WRITE_EVAL_TRACES", raising=False)
+    run_eval = load_run_eval_module()
+
+    assert run_eval.should_write_eval_traces() is True
+
+
+def test_should_write_eval_traces_returns_false_for_disabled_values(monkeypatch):
+    run_eval = load_run_eval_module()
+
+    for value in ["false", "0", "off", "no"]:
+        monkeypatch.setenv("WRITE_EVAL_TRACES", value)
+        assert run_eval.should_write_eval_traces() is False
+
+
 def test_is_mode_enabled_for_sample_returns_true_when_field_missing():
     run_eval = load_run_eval_module()
     sample = {"id": "sample-without-enabled-modes"}
@@ -171,6 +188,64 @@ def test_evalvate_answer_sources_returns_none_when_not_configured():
     assert result["expected_sources_contains"] == []
     assert result["source_hits"] == []
     assert result["source_citation_hit"] is None
+
+
+def test_build_eval_trace_payload_includes_agent_fields_when_present():
+    run_eval = load_run_eval_module()
+    sample = {
+        "id": "qa-tool-use-001",
+        "task_type": "qa",
+        "question": "tool use 是什么？",
+    }
+    retrieval_eval = {
+        "primary_hit": True,
+        "sources": ["/tmp/tool.md#tool-1"],
+    }
+    agent_eval = {
+        "expected_answer_hit": True,
+        "source_citation_hit": True,
+    }
+    answer_result = SimpleNamespace(
+        answer="tool use 是指 Agent 调用外部工具。",
+        sources=["/tmp/tool.md#tool-1"],
+        debug={"initial_queries": ["tool use 是什么？"]},
+    )
+
+    payload = run_eval.build_eval_trace_payload(
+        mode="hybrid",
+        sample=sample,
+        retrieval_eval=retrieval_eval,
+        agent_eval=agent_eval,
+        answer_result=answer_result,
+    )
+
+    assert payload["sample_id"] == "qa-tool-use-001"
+    assert payload["mode"] == "hybrid"
+    assert payload["retrieval_eval"] == retrieval_eval
+    assert payload["agent_eval"] == agent_eval
+    assert payload["answer_preview"] == "tool use 是指 Agent 调用外部工具。"
+    assert payload["answer_sources"] == ["/tmp/tool.md#tool-1"]
+    assert payload["agent_debug"] == {"initial_queries": ["tool use 是什么？"]}
+
+
+def test_append_eval_trace_writes_jsonl_record(monkeypatch, tmp_path: Path):
+    run_eval = load_run_eval_module()
+    trace_path = tmp_path / "eval_traces.jsonl"
+    monkeypatch.setattr(run_eval, "EVAL_TRACE_PATH", trace_path)
+
+    payload = {
+        "sample_id": "qa-tool-use-001",
+        "mode": "hybrid",
+        "task_type": "qa",
+        "question": "tool use 是什么？",
+        "retrieval_eval": {"primary_hit": True},
+    }
+
+    run_eval.append_eval_trace(payload)
+
+    lines = trace_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0]) == payload
 
 
 def test_should_run_agent_sample_respects_selected_sample_whitelist():

@@ -228,10 +228,24 @@
   - 只跑带 `study_plan` 标签的样本
   - `EVAL_TAGS=rag,study_plan`
   - 只跑同时命中 `rag` 或 `study_plan` 标签的样本集合
+- `eval/run_eval.py` 还支持通过 `WRITE_EVAL_TRACES` 控制是否写出结构化评估 trace：
+  - `WRITE_EVAL_TRACES=true`
+  - 运行时会把每条样本的评估结果写入 `eval/eval_traces.jsonl`
+  - 便于后续统一分析 query、retry、source citation 和 memory 对检索效果的影响
 - 示例：
   - `RUN_AGENT_EVAL=false /Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python eval/run_eval.py`
   - `RUN_AGENT_EVAL=true EVAL_MODES=hybrid /Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python eval/run_eval.py`
   - `RUN_AGENT_EVAL=true EVAL_MODES=hybrid EVAL_TAGS=study_plan /Users/a1-6/Desktop/AIAgent/05-project/.conda/bin/python eval/run_eval.py`
+- 评估 trace 当前会记录：
+  - `sample_id`
+  - `mode`
+  - `task_type`
+  - `question`
+  - `retrieval_eval`
+  - `agent_eval`（如果该样本进入真实 Agent Eval）
+  - `answer_preview`
+  - `answer_sources`
+  - `agent_debug`
 - 对 `study_plan` 场景，主评估指标为：
   - `Expected Answer Hit`
   - `Forbidden Answer Hit`

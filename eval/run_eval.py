@@ -8,6 +8,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 APP_DIR = PROJECT_ROOT / "app"
 EVAL_CONFIG_PATH = PROJECT_ROOT / "eval" / "eval_config.json"
+EVAL_TRACE_PATH = PROJECT_ROOT / "eval" / "eval_traces.jsonl"
 
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
@@ -103,6 +104,11 @@ def get_eval_tags() -> set[str] | None:
 
     tags = {item.strip() for item in raw_value.split(",") if item.strip()}
     return tags or None
+
+def should_write_eval_traces() -> bool:
+    """读取 WRITE_EVAL_TRACES 开关，控制是否把评估过程中的检索 trace 写入到文件。"""
+    raw_value = os.getenv("WRITE_EVAL_TRACES", "true").strip().lower()
+    return raw_value not in {"0", "false", "no", "off"}
 
 
 def retrieve_for_mode(
@@ -324,6 +330,39 @@ def evaluate_agent_sample(sample: dict, answer_result) -> dict:
     )
     return evaluated
 
+def append_eval_trace(payload: dict) -> None:
+    """把评估过程中的检索 trace 写入到文件，方便后续分析和调试。"""
+    EVAL_TRACE_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    with EVAL_TRACE_PATH.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+def build_eval_trace_payload(
+    mode: str,
+    sample: dict,
+    retrieval_eval: dict,
+    agent_eval: dict | None = None,
+    answer_result=None,
+) -> dict:
+    """构建一个评估 trace 的 payload，包含样本基本信息、检索评估结果、以及如果有的话，答案评估结果和模型输出的相关信息。这个 payload 会被写入到 eval_traces.jsonl 文件中，供后续分析和调试使用。"""
+    payload = {
+        "sample_id": sample["id"],
+        "mode": mode,
+        "task_type": sample["task_type"],
+        "question": sample["question"],
+        "retrieval_eval": retrieval_eval,
+    }
+
+    if answer_result is not None:
+        payload["answer_preview"] = answer_result.answer[:200]
+        payload["answer_sources"] = answer_result.sources
+        payload["agent_debug"] = getattr(answer_result, "debug", {})
+
+    if agent_eval is not None:
+        payload["agent_eval"] = agent_eval
+
+    return payload
+
 def should_run_agent_sample(sample: dict) -> bool:
     """控制哪些样本进入真实 Agent Eval，避免一次性把所有题都打到模型。"""
     allowed_ids = {
@@ -482,6 +521,13 @@ def main():
     print(f"EVAL_TAGS={','.join(sorted(active_tags)) if active_tags else 'all'}")
     print(f"RUN_AGENT_EVAL={run_agent_eval}")
 
+    # 控制是否写评估 trace，以及如果写的话，写到哪里。
+    write_eval_traces = should_write_eval_traces()
+    print(f"WRITE_EVAL_TRACES={write_eval_traces}")
+    # 如果启用了写评估 trace，并且之前的 trace 文件存在，就先删除它，确保本次评估的 trace 是干净的，不会和之前的结果混在一起，方便后续分析和调试。
+    if write_eval_traces and EVAL_TRACE_PATH.exists():
+        EVAL_TRACE_PATH.unlink()
+
     modes = get_eval_modes()
     all_results: dict[str, list[dict]] = {}
     all_agent_results: dict[str, list[dict]] = {}
@@ -526,6 +572,19 @@ def main():
             evaluated = evaluate_sample(sample, retrieved)
             mode_results.append(evaluated)
 
+            # 评估完检索结果后，先把这个评估结果写入 trace 文件，方便我们在后续分析时，能看到每个样本在每个 mode 下的检索表现，以及它们的来源情况。
+            # 这些信息对于我们理解模型的行为、分析失败案例、以及指导后续的优化方向，都非常有价值。
+            if write_eval_traces and not (run_agent_eval and should_run_agent_sample(sample)):
+                trace_payload = build_eval_trace_payload(
+                    mode=mode,
+                    sample=sample,
+                    retrieval_eval=evaluated,
+                )
+                append_eval_trace(trace_payload)
+
+            # 控制哪些样本进入真实 Agent Eval，避免一次性把所有题都打到模型，造成不必要的成本和等待时间。
+            # 我们可以通过 sample 的 id 来控制，只有那些 id 在 should_run_agent_sample 函数里明确列出的样本，才会进入真实的 ask_course_agent 调用和评估。
+            # 这样我们就可以先选一些典型的样本进行初步评估和分析，等我们对模型的表现有了更深入的理解之后，再逐步放开更多的样本进行全面评估。
             if run_agent_eval and should_run_agent_sample(sample):
                 answer_result = ask_course_agent(
                     question=sample["question"],
@@ -538,6 +597,16 @@ def main():
                 )
                 evaluated_agent = evaluate_agent_sample(sample, answer_result)
                 mode_agent_results.append(evaluated_agent)
+
+                if write_eval_traces:
+                    trace_payload = build_eval_trace_payload(
+                        mode=mode,
+                        sample=sample,
+                        retrieval_eval=evaluated,
+                        agent_eval=evaluated_agent,
+                        answer_result=answer_result,
+                    )
+                    append_eval_trace(trace_payload)
 
         all_results[mode] = mode_results
         all_agent_results[mode] = mode_agent_results
