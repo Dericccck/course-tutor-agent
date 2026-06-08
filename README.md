@@ -246,6 +246,9 @@
   - `answer_preview`
   - `answer_sources`
   - `agent_debug`
+- 新增 `eval/analyze_traces.py` 作为最小 trace 分析脚本：
+  - 会同时读取 `data/retrieval_traces.jsonl` 和 `eval/eval_traces.jsonl`
+  - 当前会汇总 `retry 触发率 / llm rewrite 使用率 / task_type 分布 / source citation hit / retry-heavy samples`
 - 对 `study_plan` 场景，主评估指标为：
   - `Expected Answer Hit`
   - `Forbidden Answer Hit`
