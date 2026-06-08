@@ -245,3 +245,88 @@ def test_generate_optimization_suggestions_returns_actionable_chinese_hints():
     assert any("来源引用命中率偏低" in item for item in suggestions)
     assert any("以下样本最常触发 Retry" in item for item in suggestions)
     assert any("评估集的 Retry 率明显高于 CLI 真实交互" in item for item in suggestions)
+
+
+def test_analyze_task_type_breakdown_summarizes_retry_and_source_hits():
+    analyze_traces = load_analyze_traces_module()
+    records = [
+        {
+            "task_type": "summary",
+            "agent_debug": {
+                "retry_triggered": True,
+                "llm_retry_query": "summary lesson rewrite",
+            },
+            "agent_eval": {
+                "source_citation_hit": False,
+            },
+        },
+        {
+            "task_type": "summary",
+            "agent_debug": {
+                "retry_triggered": False,
+                "llm_retry_query": None,
+            },
+            "agent_eval": {
+                "source_citation_hit": True,
+            },
+        },
+        {
+            "task_type": "qa",
+            "agent_debug": {
+                "retry_triggered": False,
+                "llm_retry_query": None,
+            },
+            "agent_eval": {
+                "source_citation_hit": True,
+            },
+        },
+    ]
+
+    summaries = analyze_traces.analyze_task_type_breakdown(records)
+
+    assert summaries["summary"]["total"] == 2
+    assert summaries["summary"]["retry_count"] == 1
+    assert summaries["summary"]["retry_rate"] == 0.5
+    assert summaries["summary"]["llm_retry_count"] == 1
+    assert summaries["summary"]["source_hit_true"] == 1
+    assert summaries["summary"]["source_hit_total"] == 2
+    assert summaries["summary"]["source_hit_rate"] == 0.5
+    assert summaries["qa"]["total"] == 1
+    assert summaries["qa"]["retry_rate"] == 0.0
+
+
+def test_generate_task_type_suggestions_returns_task_specific_hints():
+    analyze_traces = load_analyze_traces_module()
+    task_summaries = {
+        "summary": {
+            "task_type": "summary",
+            "total": 4,
+            "retry_count": 3,
+            "retry_rate": 0.75,
+            "llm_retry_count": 2,
+            "llm_retry_rate": 0.5,
+            "source_hit_total": 4,
+            "source_hit_true": 2,
+            "source_hit_rate": 0.5,
+        },
+        "qa": {
+            "task_type": "qa",
+            "total": 3,
+            "retry_count": 0,
+            "retry_rate": 0.0,
+            "llm_retry_count": 0,
+            "llm_retry_rate": 0.0,
+            "source_hit_total": 3,
+            "source_hit_true": 3,
+            "source_hit_rate": 1.0,
+        },
+    }
+
+    suggestions = analyze_traces.generate_task_type_suggestions(task_summaries)
+
+    assert any("summary 的 Retry 率偏高" in item for item in suggestions["summary"])
+    assert any("summary 对 LLM rewrite 依赖偏高" in item for item in suggestions["summary"])
+    assert any("summary 的来源引用命中率偏低" in item for item in suggestions["summary"])
+    assert suggestions["qa"] == [
+        "qa 当前没有暴露明显短板，可以先保持现状，继续扩大样本覆盖。"
+    ]

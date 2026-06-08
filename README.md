@@ -254,6 +254,7 @@
   - 优先优化 generic summary 的首轮 query
   - 优先检查 grounding / source normalization
   - 优先分析最常触发 retry 的样本，而不是继续全局加规则
+- `eval/analyze_traces.py` 现在还会按 `qa / summary / study_plan` 分别给出拆分建议，帮助更快判断是哪个任务类型最不稳
 - 对 `study_plan` 场景，主评估指标为：
   - `Expected Answer Hit`
   - `Forbidden Answer Hit`

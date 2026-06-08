@@ -245,6 +245,45 @@ def analyze_question_patterns(records: list[dict]) -> dict:
         "question_retry_stats": question_retry_stats,
     }
 
+def analyze_task_type_breakdown(records: list[dict]) -> dict:
+    """按 task_type 聚合，观察不同任务类型的 retry / llm rewrite / source hit 表现。"""
+    grouped = group_records(records, "task_type")
+    task_summaries: dict[str, dict] = {}
+
+    for task_type, items in grouped.items():
+        total = len(items)
+        retry_count = 0
+        llm_retry_count = 0
+        source_hit_total = 0
+        source_hit_true = 0
+
+        for item in items:
+            agent_debug = item.get("agent_debug", {})
+            if agent_debug.get("retry_triggered"):
+                retry_count += 1
+            if agent_debug.get("llm_retry_query"):
+                llm_retry_count += 1
+
+            agent_eval = item.get("agent_eval")
+            if agent_eval and agent_eval.get("source_citation_hit") is not None:
+                source_hit_total += 1
+                if agent_eval.get("source_citation_hit"):
+                    source_hit_true += 1
+
+        task_summaries[task_type] = {
+            "task_type": task_type,
+            "total": total,
+            "retry_count": retry_count,
+            "retry_rate": (retry_count / total) if total else 0.0,
+            "llm_retry_count": llm_retry_count,
+            "llm_retry_rate": (llm_retry_count / total) if total else 0.0,
+            "source_hit_total": source_hit_total,
+            "source_hit_true": source_hit_true,
+            "source_hit_rate": (source_hit_true / source_hit_total) if source_hit_total else 0.0,
+        }
+
+    return task_summaries
+
 def generate_optimization_suggestions(
     cli_summary: dict,
     eval_summary: dict,
@@ -295,6 +334,61 @@ def generate_optimization_suggestions(
         suggestions.append("当前 trace 没有暴露明显短板，下一步可以继续扩大评估覆盖或开始接 tracing 平台。")
 
     return suggestions
+
+def generate_task_type_suggestions(task_summaries: dict[str, dict]) -> dict[str, list[str]]:
+    """针对 qa / summary / study_plan 分别生成更具体的优化建议。"""
+    suggestions_by_task: dict[str, list[str]] = {}
+
+    for task_type, summary in task_summaries.items():
+        suggestions: list[str] = []
+
+        retry_rate = summary["retry_rate"]
+        llm_retry_rate = summary["llm_retry_rate"]
+        source_hit_total = summary["source_hit_total"]
+        source_hit_rate = summary["source_hit_rate"]
+
+        if task_type == "summary":
+            if retry_rate >= 0.4:
+                suggestions.append("summary 的 Retry 率偏高，优先优化 generic summary 的首轮 query 和课程锚点识别。")
+            if llm_retry_rate >= 0.3:
+                suggestions.append("summary 对 LLM rewrite 依赖偏高，建议检查 rewrite 是否真正提供了 lesson / notebook / 章节锚点。")
+            if source_hit_total > 0 and source_hit_rate < 0.8:
+                suggestions.append("summary 的来源引用命中率偏低，建议优先检查总结 prompt 的 source 约束和 summary narrowing。")
+
+        elif task_type == "qa":
+            if retry_rate >= 0.4:
+                suggestions.append("qa 的 Retry 率偏高，建议优先优化概念题的首轮 query，而不是继续扩大 retry 范围。")
+            if llm_retry_rate >= 0.3:
+                suggestions.append("qa 对 LLM rewrite 依赖偏高，建议检查规则型 query 是否已经覆盖常见概念词。")
+            if source_hit_total > 0 and source_hit_rate < 0.8:
+                suggestions.append("qa 的来源引用命中率偏低，建议优先检查 grounding prompt 和 sources 归一化逻辑。")
+
+        elif task_type == "study_plan":
+            if retry_rate >= 0.4:
+                suggestions.append("study_plan 的 Retry 率偏高，建议优先优化学习路线类问题的首轮 query，以及 goal / recent_focus 的利用方式。")
+            if llm_retry_rate >= 0.3:
+                suggestions.append("study_plan 对 LLM rewrite 依赖偏高，建议检查规则型 roadmap query 是否已经足够覆盖课程主线。")
+            if source_hit_total > 0 and source_hit_rate < 0.8:
+                suggestions.append("study_plan 的来源引用命中率偏低，建议优先检查 post-rank 后的 prompt_chunks 是否仍然保留了关键路径来源。")
+
+        if not suggestions:
+            suggestions.append(f"{task_type} 当前没有暴露明显短板，可以先保持现状，继续扩大样本覆盖。")
+
+        suggestions_by_task[task_type] = suggestions
+
+    return suggestions_by_task
+
+def print_task_type_suggestions(task_suggestions: dict[str, list[str]]) -> None:
+    print("\n=== 按任务类型拆分的优化建议 ===")
+
+    if not task_suggestions:
+        print("（空）")
+        return
+
+    for task_type, suggestions in task_suggestions.items():
+        print(f"\n[{task_type}]")
+        for item in suggestions:
+            print(f"- {item}")
 
 
 def print_counter(title: str, counter: Counter) -> None:
@@ -365,6 +459,23 @@ def print_optimization_suggestions(suggestions: list[str]) -> None:
     for item in suggestions:
         print(f"- {item}")
 
+def print_task_type_summary(task_summaries: dict[str, dict]) -> None:
+    print("\n=== 按任务类型拆分的统计 ===")
+
+    if not task_summaries:
+        print("（空）")
+        return
+
+    for task_type, summary in sorted(task_summaries.items()):
+        print(f"\n[{task_type}]")
+        print(f"- 样本数: {summary['total']}")
+        print(f"- Retry: {summary['retry_count']} ({summary['retry_rate']:.2%})")
+        print(f"- LLM Retry: {summary['llm_retry_count']} ({summary['llm_retry_rate']:.2%})")
+        print(
+            f"- 来源引用命中: {summary['source_hit_true']}/{summary['source_hit_total']} "
+            f"({summary['source_hit_rate']:.2%})"
+        )
+
 def main() -> None:
     """主函数，加载 CLI 和 Eval 的 trace 数据，进行分析，并打印报告。"""
     cli_records = load_jsonl(CLI_TRACE_PATH)
@@ -377,16 +488,20 @@ def main() -> None:
     eval_summary = analyze_eval_traces(eval_records)
     eval_failures = analyze_eval_failures(eval_records)
     question_patterns = analyze_question_patterns(eval_records)
+    task_summaries = analyze_task_type_breakdown(eval_records)
     suggestions = generate_optimization_suggestions(
         cli_summary,
         eval_summary,
         eval_failures,
         question_patterns,
     )
+    task_suggestions = generate_task_type_suggestions(task_summaries)
 
     print_cli_report(cli_summary)
     print_eval_report(eval_summary, eval_failures, question_patterns)
+    print_task_type_summary(task_summaries)
     print_optimization_suggestions(suggestions)
+    print_task_type_suggestions(task_suggestions)
 
 
 if __name__ == "__main__":
