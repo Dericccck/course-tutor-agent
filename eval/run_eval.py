@@ -388,36 +388,36 @@ def print_mode_summary(mode: str, results: list[dict]) -> None:
         if item["group_coverage"] is not None
     ]
 
-    print(f"\n=== Mode: {mode} ===")
+    print(f"\n=== 检索模式: {mode} ===")
     if coverage_items:
         average_group_coverage = sum(
             item["group_coverage"] for item in coverage_items
         ) / len(coverage_items)
-        print(f"Average Group Coverage: {average_group_coverage:.2f}")
-    print(f"Total: {total}")
-    print(f"Primary Hit: {primary_hits}/{total}")
-    print(f"Group Hit: {group_hits}/{total}")
+        print(f"平均课程簇覆盖率: {average_group_coverage:.2f}")
+    print(f"样本总数: {total}")
+    print(f"首条来源命中: {primary_hits}/{total}")
+    print(f"课程簇命中: {group_hits}/{total}")
 
     if summary_items:
         print(
-            f"Summary Pollution: {summary_pollutions}/{len(summary_items)} "
+            f"总结污染数: {summary_pollutions}/{len(summary_items)} "
             f"(越低越好)"
         )
 
 
 def print_detailed_results(mode: str, results: list[dict]) -> None:
-    print(f"\n--- Detailed Results: {mode} ---")
+    print(f"\n--- 详细结果: {mode} ---")
     for item in results:
         print(f"\n[{item['id']}] {item['question']}")
-        print(f"  First Source: {item['first_source']}")
-        print(f"  Primary Hit: {item['primary_hit']}")
-        print(f"  First Group: {item['first_group']}")
-        print(f"  Group Hit: {item['group_hit']}")
-        print(f"  Summary Polluted: {item['summary_polluted']}")
+        print(f"  首条来源: {item['first_source']}")
+        print(f"  首条来源命中: {item['primary_hit']}")
+        print(f"  首条课程簇: {item['first_group']}")
+        print(f"  课程簇命中: {item['group_hit']}")
+        print(f"  是否总结污染: {item['summary_polluted']}")
         if item["group_coverage"] is not None:
-            print(f"  Covered Groups: {item['covered_groups']}")
-            print(f"  Group Coverage: {item['group_coverage']:.2f}")
-        print("  Sources:")
+            print(f"  命中的课程簇: {item['covered_groups']}")
+            print(f"  课程簇覆盖率: {item['group_coverage']:.2f}")
+        print("  来源列表:")
         for source in item["sources"]:
             print(f"    - {source}")
 
@@ -453,48 +453,48 @@ def print_agent_summary(mode: str, results: list[dict]) -> None:
     ]
     source_hits = sum(1 for item in source_hit_items if item["source_citation_hit"])
 
-    print(f"\n=== Agent Mode: {mode} (selected samples) ===")
-    print(f"Total: {total}")
-    print(f"Primary Hit: {primary_hits}/{total}")
-    print(f"Group Hit: {group_hits}/{total}")
-    print("Main Metric: Expected Answer Hit / Forbidden Answer Hit")
+    print(f"\n=== Agent 评估模式: {mode}（selected samples）===")
+    print(f"样本总数: {total}")
+    print(f"首条来源命中: {primary_hits}/{total}")
+    print(f"课程簇命中: {group_hits}/{total}")
+    print("主指标: Expected Answer Hit / Forbidden Answer Hit")
     if average_group_coverage is not None:
-        print(f"Average Group Coverage: {average_group_coverage:.2f}")
+        print(f"平均课程簇覆盖率: {average_group_coverage:.2f}")
 
     if answer_hit_items:
-        print(f"Expected Answer Hit: {answer_hits}/{len(answer_hit_items)} (越高越好)")
-    print(f"Forbidden Answer Hit: {forbidden_hits}/{total} (越低越好)")
+        print(f"期望答案命中: {answer_hits}/{len(answer_hit_items)} (越高越好)")
+    print(f"禁用答案命中: {forbidden_hits}/{total} (越低越好)")
 
     if source_hit_items:
-        print(f"Source Citation Hit: {source_hits}/{len(source_hit_items)}(越高越好)")
+        print(f"来源引用命中: {source_hits}/{len(source_hit_items)}(越高越好)")
 
 
 def print_agent_detailed_results(mode: str, results: list[dict]) -> None:
     if not results:
         return
 
-    print(f"\n--- Agent Detailed Results: {mode} ---")
+    print(f"\n--- Agent 详细结果: {mode} ---")
     for item in results:
         print(f"\n[{item['id']}] {item['question']}")
-        print(f"  First Source: {item['first_source']}")
-        print(f"  Primary Hit: {item['primary_hit']}")
-        print(f"  First Group: {item['first_group']}")
-        print(f"  Group Hit: {item['group_hit']}")
+        print(f"  首条来源: {item['first_source']}")
+        print(f"  首条来源命中: {item['primary_hit']}")
+        print(f"  首条课程簇: {item['first_group']}")
+        print(f"  课程簇命中: {item['group_hit']}")
         if item["group_coverage"] is not None:
-            print(f"  Covered Groups: {item['covered_groups']}")
-            print(f"  Group Coverage: {item['group_coverage']:.2f}")
-        print(f"  Suggestion Count: {item['suggestion_count']}")
+            print(f"  命中的课程簇: {item['covered_groups']}")
+            print(f"  课程簇覆盖率: {item['group_coverage']:.2f}")
+        print(f"  建议条数: {item['suggestion_count']}")
         if item["expected_answer_hit"] is not None: # 只有当 sample 中有 expected_answer_contains 时，这个字段才有意义，我们才打印相关信息。
-            print(f"  Expected Answer Hit: {item['expected_answer_hit']}")
-            print(f"  Expected Hits: {item['expected_hits']}")
-        print(f"  Forbidden Answer Hit: {item['forbidden_answer_hit']}")
+            print(f"  期望答案命中: {item['expected_answer_hit']}")
+            print(f"  期望命中项: {item['expected_hits']}")
+        print(f"  禁用答案命中: {item['forbidden_answer_hit']}")
         if item["forbidden_hits"]: # 只有当实际命中了 forbidden_answer_contains 时，这个列表才有内容，我们才打印相关信息。
-            print(f"  Forbidden Hits: {item['forbidden_hits']}")
+            print(f"  禁用命中项: {item['forbidden_hits']}")
         if item["source_citation_hit"] is not None:
-            print(f"  Source Citation Hit: {item['source_citation_hit']}")
-            print(f"  Source Hits: {item['source_hits']}")
-        print(f"  Answer Preview: {item['answer_preview']}")
-        print("  Sources:")
+            print(f"  来源引用命中: {item['source_citation_hit']}")
+            print(f"  来源命中项: {item['source_hits']}")
+        print(f"  回答预览: {item['answer_preview']}")
+        print("  来源列表:")
         for source in item["sources"]:
             print(f"    - {source}")
 
@@ -514,16 +514,16 @@ def main():
         include_dirs=settings.course_include_dirs,
     )
 
-    print(f"Loaded {len(documents)} documents")
-    print(f"Loaded {len(chunks)} chunks")
-    print(f"Loaded {len(questions)} eval questions")
-    print(f"EVAL_MODES={','.join(modes)}")
-    print(f"EVAL_TAGS={','.join(sorted(active_tags)) if active_tags else 'all'}")
-    print(f"RUN_AGENT_EVAL={run_agent_eval}")
+    print(f"已加载文档数: {len(documents)}")
+    print(f"已加载切块数: {len(chunks)}")
+    print(f"已加载评估题数: {len(questions)}")
+    print(f"评估模式 EVAL_MODES={','.join(modes)}")
+    print(f"评估标签 EVAL_TAGS={','.join(sorted(active_tags)) if active_tags else 'all'}")
+    print(f"是否运行 Agent Eval={run_agent_eval}")
 
     # 控制是否写评估 trace，以及如果写的话，写到哪里。
     write_eval_traces = should_write_eval_traces()
-    print(f"WRITE_EVAL_TRACES={write_eval_traces}")
+    print(f"是否写入评估 Trace={write_eval_traces}")
     # 如果启用了写评估 trace，并且之前的 trace 文件存在，就先删除它，确保本次评估的 trace 是干净的，不会和之前的结果混在一起，方便后续分析和调试。
     if write_eval_traces and EVAL_TRACE_PATH.exists():
         EVAL_TRACE_PATH.unlink()
@@ -558,7 +558,7 @@ def main():
 
             sample_memory = sample.get("memory")
 
-            print(f"\nRunning mode: {mode}")
+            print(f"\n正在运行评估模式: {mode}")
             retrieved = retrieve_for_mode(
                 question=sample["question"],
                 mode=mode,

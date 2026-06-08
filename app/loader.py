@@ -88,7 +88,7 @@ def load_documents(root_dir: str, include_dirs: list[str] | None = None,) -> lis
         try:
             documents.append(load_markdown_file(path))
         except Exception as exc:
-            print(f"Skip {path}: {exc}")
+            print(f"跳过文件 {path}: {exc}")
 
     return documents
 

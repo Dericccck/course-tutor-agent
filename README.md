@@ -249,6 +249,7 @@
 - 新增 `eval/analyze_traces.py` 作为最小 trace 分析脚本：
   - 会同时读取 `data/retrieval_traces.jsonl` 和 `eval/eval_traces.jsonl`
   - 当前会汇总 `retry 触发率 / llm rewrite 使用率 / task_type 分布 / source citation hit / retry-heavy samples`
+- CLI、评估脚本和 trace 分析脚本当前主要控制台输出已统一改成中文，便于直接阅读运行结果和调试信息
 - 对 `study_plan` 场景，主评估指标为：
   - `Expected Answer Hit`
   - `Forbidden Answer Hit`
