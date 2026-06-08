@@ -38,6 +38,16 @@ def load_jsonl(path: Path) -> list[dict]:
             items.append(json.loads(text))
     return items
 
+def group_records(records: list[dict], key_name: str) -> dict[str, list[dict]]:
+    """按某个字段把 trace 记录分组，方便后面做样本级统计。"""
+    grouped: dict[str, list[dict]] = {}
+
+    for item in records:
+        key = item.get(key_name, "unknown")
+        grouped.setdefault(key, []).append(item)
+
+    return grouped
+
 
 def analyze_cli_traces(records: list[dict]) -> dict:
     """分析 CLI trace 的记录，统计不同任务类型的出现次数，以及重试的情况。
@@ -114,38 +124,190 @@ def analyze_eval_traces(records: list[dict]) -> dict:
         "retry_samples": retry_samples,
     }
 
+def analyze_eval_failures(records: list[dict]) -> dict:
+    """对 eval traces 做样本级失败分析，找出最不稳定的样本。"""
+    grouped = group_records(records, "sample_id")
+
+    retry_heavy_samples: list[dict] = []
+    source_miss_samples: list[dict] = []
+    llm_retry_heavy_samples: list[dict] = []
+
+    for sample_id, items in grouped.items():
+        total = len(items)
+        if total == 0:
+            continue
+
+        retry_count = 0
+        llm_retry_count = 0
+        source_hit_total = 0
+        source_hit_false = 0
+        question = items[0].get("question", "")
+        task_type = items[0].get("task_type", "unknown")
+
+        for item in items:
+            agent_debug = item.get("agent_debug", {})
+            if agent_debug.get("retry_triggered"):
+                retry_count += 1
+
+            if agent_debug.get("llm_retry_query"):
+                llm_retry_count += 1
+
+            agent_eval = item.get("agent_eval")
+            if agent_eval and agent_eval.get("source_citation_hit") is not None:
+                source_hit_total += 1
+                if not agent_eval.get("source_citation_hit"):
+                    source_hit_false += 1
+
+        retry_heavy_samples.append(
+            {
+                "sample_id": sample_id,
+                "question": question,
+                "task_type": task_type,
+                "total": total,
+                "retry_count": retry_count,
+                "retry_rate": retry_count / total,
+            }
+        )
+
+        llm_retry_heavy_samples.append(
+            {
+                "sample_id": sample_id,
+                "question": question,
+                "task_type": task_type,
+                "total": total,
+                "llm_retry_count": llm_retry_count,
+                "llm_retry_rate": llm_retry_count / total,
+            }
+        )
+
+        if source_hit_total > 0:
+            source_miss_samples.append(
+                {
+                    "sample_id": sample_id,
+                    "question": question,
+                    "task_type": task_type,
+                    "source_hit_total": source_hit_total,
+                    "source_hit_false": source_hit_false,
+                    "source_miss_rate": source_hit_false / source_hit_total,
+                }
+            )
+
+    retry_heavy_samples.sort(key=lambda item: (-item["retry_rate"], -item["retry_count"], item["sample_id"]))
+    llm_retry_heavy_samples.sort(key=lambda item: (-item["llm_retry_rate"], -item["llm_retry_count"], item["sample_id"]))
+    source_miss_samples.sort(key=lambda item: (-item["source_miss_rate"], -item["source_hit_false"], item["sample_id"]))
+
+    return {
+        "retry_heavy_samples": retry_heavy_samples,
+        "llm_retry_heavy_samples": llm_retry_heavy_samples,
+        "source_miss_samples": source_miss_samples,
+    }
+
+def analyze_question_patterns(records: list[dict]) -> dict:
+    """按 question 文本聚合，观察哪些问法更容易触发 retry 或 citation miss。"""
+    grouped = group_records(records, "question")
+
+    question_retry_stats: list[dict] = []
+
+    for question, items in grouped.items():
+        total = len(items)
+        if total == 0:
+            continue
+
+        retry_count = 0
+        llm_retry_count = 0
+        task_types = set()
+
+        for item in items:
+            task_types.add(item.get("task_type", "unknown"))
+            agent_debug = item.get("agent_debug", {})
+            if agent_debug.get("retry_triggered"):
+                retry_count += 1
+            if agent_debug.get("llm_retry_query"):
+                llm_retry_count += 1
+
+        question_retry_stats.append(
+            {
+                "question": question,
+                "task_types": sorted(task_types),
+                "total": total,
+                "retry_count": retry_count,
+                "retry_rate": retry_count / total,
+                "llm_retry_count": llm_retry_count,
+                "llm_retry_rate": llm_retry_count / total,
+            }
+        )
+
+    question_retry_stats.sort(
+        key=lambda item: (-item["retry_rate"], -item["llm_retry_rate"], item["question"])
+    )
+
+    return {
+        "question_retry_stats": question_retry_stats,
+    }
+
 
 def print_counter(title: str, counter: Counter) -> None:
     """打印 Counter 统计结果，按照出现频率从高到低排序。"""
     print(title)
     if not counter:
-        print("  (empty)")
+        print("  （空）")
         return
 
     for key, value in counter.most_common():
         print(f"  - {key}: {value}")
 
+def print_top_items(title: str, items: list[dict], fields: list[str], top_n: int = 5) -> None:
+    """打印前 N 个高风险/高频样本，避免一次输出太长。"""
+    print(title)
+    if not items:
+        print("  （空）")
+        return
+
+    for item in items[:top_n]:
+        values = [f"{field}={item.get(field)}" for field in fields]
+        print("  - " + ", ".join(values))
+
 
 def print_cli_report(summary: dict) -> None:
-    print("\n=== CLI Trace Summary ===")
-    print(f"Total: {summary['total']}")
-    print(f"Retry Triggered: {summary['retry_count']} ({summary['retry_rate']:.2%})")
-    print(f"LLM Retry Used: {summary['llm_retry_count']} ({summary['llm_retry_rate']:.2%})")
-    print_counter("Task Types:", summary["task_counter"])
+    print("\n=== CLI Trace 汇总 ===")
+    print(f"总条数: {summary['total']}")
+    print(f"触发 Retry: {summary['retry_count']} ({summary['retry_rate']:.2%})")
+    print(f"使用 LLM Retry: {summary['llm_retry_count']} ({summary['llm_retry_rate']:.2%})")
+    print_counter("任务类型分布:", summary["task_counter"])
 
 
-def print_eval_report(summary: dict) -> None:
-    print("\n=== Eval Trace Summary ===")
-    print(f"Total: {summary['total']}")
-    print(f"Retry Triggered: {summary['retry_count']} ({summary['retry_rate']:.2%})")
-    print(f"LLM Retry Used: {summary['llm_retry_count']} ({summary['llm_retry_rate']:.2%})")
+def print_eval_report(summary: dict, failures: dict, patterns: dict) -> None:
+    print("\n=== Eval Trace 汇总 ===")
+    print(f"总条数: {summary['total']}")
+    print(f"触发 Retry: {summary['retry_count']} ({summary['retry_rate']:.2%})")
+    print(f"使用 LLM Retry: {summary['llm_retry_count']} ({summary['llm_retry_rate']:.2%})")
     print(
-        f"Source Citation Hit: {summary['source_hit_true']}/{summary['source_hit_total']} "
+        f"来源引用命中: {summary['source_hit_true']}/{summary['source_hit_total']} "
         f"({summary['source_hit_rate']:.2%})"
     )
-    print_counter("Modes:", summary["mode_counter"])
-    print_counter("Task Types:", summary["task_counter"])
-    print_counter("Retry-heavy Samples:", summary["retry_samples"])
+    print_counter("模式分布:", summary["mode_counter"])
+    print_counter("任务类型分布:", summary["task_counter"])
+    print_counter("高频 Retry 样本:", summary["retry_samples"])
+    print_top_items(
+        "最容易触发 Retry 的样本:",
+        failures["retry_heavy_samples"],
+        ["sample_id", "task_type", "retry_count", "retry_rate"],
+    )
+    print_top_items(
+        "最依赖 LLM Retry 的样本:",
+        failures["llm_retry_heavy_samples"],
+        ["sample_id", "task_type", "llm_retry_count", "llm_retry_rate"],
+    )
+    print_top_items(
+        "来源引用命中不稳的样本:",
+        failures["source_miss_samples"],
+        ["sample_id", "task_type", "source_hit_false", "source_miss_rate"],
+    )
+    print_top_items(
+        "最容易触发 Retry 的问题:",
+        patterns["question_retry_stats"],
+        ["question", "task_types", "retry_count", "retry_rate", "llm_retry_count"],
+    )
 
 
 def main() -> None:
@@ -153,14 +315,16 @@ def main() -> None:
     cli_records = load_jsonl(CLI_TRACE_PATH)
     eval_records = load_jsonl(EVAL_TRACE_PATH)
 
-    print(f"CLI trace path: {CLI_TRACE_PATH}")
-    print(f"Eval trace path: {EVAL_TRACE_PATH}")
+    print(f"CLI trace 路径: {CLI_TRACE_PATH}")
+    print(f"Eval trace 路径: {EVAL_TRACE_PATH}")
 
     cli_summary = analyze_cli_traces(cli_records)
     eval_summary = analyze_eval_traces(eval_records)
+    eval_failures = analyze_eval_failures(eval_records)
+    question_patterns = analyze_question_patterns(eval_records)
 
     print_cli_report(cli_summary)
-    print_eval_report(eval_summary)
+    print_eval_report(eval_summary, eval_failures, question_patterns)
 
 
 if __name__ == "__main__":
