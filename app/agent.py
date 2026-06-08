@@ -71,6 +71,30 @@ def narrow_summary_results(
 
     return retrieved_chunks
 
+
+def narrow_generic_summary_results(
+    retrieved_chunks: list[RetrievedChunk],
+    max_sources: int = 2,
+) -> list[RetrievedChunk]:
+    """泛 summary 先保留少量跨 source 候选，避免过早锁死到单个 notebook。"""
+    if not retrieved_chunks:
+        return []
+
+    selected: list[RetrievedChunk] = []
+    seen_sources: set[str] = set()
+
+    # 每个 source 先拿一条最高相关 chunk，优先保留 1-2 个不同 notebook。
+    for item in retrieved_chunks:
+        if item.source in seen_sources:
+            continue
+        selected.append(item)
+        seen_sources.add(item.source)
+        if len(selected) >= max_sources:
+            return selected
+
+    # 如果首轮结果几乎都来自同一个 source，就至少保留前两条，避免上下文过薄。
+    return retrieved_chunks[: min(2, len(retrieved_chunks))]
+
 # 混合检索 用 retrieve_chunks(...) 取一份结果，用 vector_store.search(...) 再取一份结果，然后把两份结果合并去重，最终返回 top_k 条结果。这样做的好处是：
 # 1. retrieve_chunks(...) 的结果通常更精准，因为它直接基于文本内容进行匹配，能够捕捉到一些细粒度的相关信息；而 vector_store.search(...) 的结果可能更全面，因为它基于向量表示进行匹配。通过混合检索，我们可以兼顾精准性和全面性，提升整体的检索效果。
 # 2. retrieve_chunks(...) 的结果可以作为 vector_store.search(...) 的补充，当 retrieve_chunks(...) 没有检索到足够的相关内容时，vector_store.search(...) 可以提供更多的候选项，增加找到相关信息的机会。反过来，当 retrieve_chunks(...) 已经检索到足够的相关内容时，我们也可以通过混合检索来引入一些 vector_store.search(...) 的结果，增加多样性和覆盖面。
@@ -347,10 +371,15 @@ def ask_course_agent(
         )
 
     if task_type == "summary":
-        retrieved_chunks = narrow_summary_results(
-            retrieved_chunks,
-            strategy=active_settings.retrieval.summary_strategy,
-        )
+        # 泛 summary 没有明确课程锚点时，先保留少量跨 source 候选；
+        # 有明确锚点的 summary 仍然走原来的 same-source 收窄，保证目标更集中。
+        if is_generic_summary_question(question) and detect_course_anchor(question) is None:
+            retrieved_chunks = narrow_generic_summary_results(retrieved_chunks)
+        else:
+            retrieved_chunks = narrow_summary_results(
+                retrieved_chunks,
+                strategy=active_settings.retrieval.summary_strategy,
+            )
     if task_type == "study_plan":
         retrieved_chunks = post_rank_study_plan_results(question, retrieved_chunks)
     

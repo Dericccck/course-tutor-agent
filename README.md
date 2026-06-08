@@ -115,6 +115,7 @@
 - 当首次检索结果过弱时，主流程会自动触发第二轮补强检索，并引入 `learning_goal / preferred_scope / recent_focus` 作为补充 query
 - retry 路径已支持 `LLM rewrite v1`：仅在弱检索补强阶段额外生成 1 条 LLM query；如果 rewrite 失败或返回 JSON/无效内容，会静默降级为规则型 retry
 - retrieval retry v3/v4 已开始使用“数量 + 弱信号”触发：对于 `帮我总结这节课`、`总结这个notebook` 这类没有课程锚点的泛 summary 问题，会优先补课程型首轮 query；只有首轮结果仍然偏弱时，才继续触发第二轮补强检索
+- 对于没有课程锚点的泛 summary，首轮结果进入 prompt 前也不会再直接收窄到单个 source；当前会优先保留 1-2 个不同 notebook 的高相关 chunk，减少“总结这个notebook”被单节课过早锁死的概率
 - `RETRIEVAL_MODE=vector` 时已支持注入 `vector_store`
 - `RETRIEVAL_MODE=hybrid` 时会合并 chunk 检索与向量检索结果
 - `RETRIEVAL_MODE=hybrid` 时会先宽召回，再按优先级与同源限制合并结果

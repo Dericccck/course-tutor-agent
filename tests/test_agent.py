@@ -278,6 +278,75 @@ def test_merge_multi_query_results_deduplicates_and_keeps_highest_score():
     ]
 
 
+def test_narrow_generic_summary_results_prefers_small_cross_source_mix():
+    retrieved_chunks = [
+        RetrievedChunk(
+            source="/tmp/source-a.md",
+            title="A",
+            chunk_id="a-1",
+            snippet="a1",
+            score=9.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/source-a.md",
+            title="A",
+            chunk_id="a-2",
+            snippet="a2",
+            score=8.5,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/source-b.md",
+            title="B",
+            chunk_id="b-1",
+            snippet="b1",
+            score=8.0,
+            tags=["agent"],
+        ),
+    ]
+
+    narrowed = agent.narrow_generic_summary_results(retrieved_chunks)
+
+    assert [item.source for item in narrowed] == [
+        "/tmp/source-a.md",
+        "/tmp/source-b.md",
+    ]
+
+
+def test_narrow_generic_summary_results_falls_back_to_two_chunks_when_single_source():
+    retrieved_chunks = [
+        RetrievedChunk(
+            source="/tmp/source-a.md",
+            title="A",
+            chunk_id="a-1",
+            snippet="a1",
+            score=9.0,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/source-a.md",
+            title="A",
+            chunk_id="a-2",
+            snippet="a2",
+            score=8.5,
+            tags=["agent"],
+        ),
+        RetrievedChunk(
+            source="/tmp/source-a.md",
+            title="A",
+            chunk_id="a-3",
+            snippet="a3",
+            score=8.0,
+            tags=["agent"],
+        ),
+    ]
+
+    narrowed = agent.narrow_generic_summary_results(retrieved_chunks)
+
+    assert [item.chunk_id for item in narrowed] == ["a-1", "a-2"]
+
+
 def test_should_retry_retrieval_uses_task_specific_thresholds():
     one_chunk = [make_chunk("04 Tool Use 学习摘要")]
     two_chunks = [make_chunk("04 Tool Use 学习摘要"), make_chunk("05 Agentic RAG 学习摘要")]
