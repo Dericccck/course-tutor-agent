@@ -250,6 +250,10 @@
   - 会同时读取 `data/retrieval_traces.jsonl` 和 `eval/eval_traces.jsonl`
   - 当前会汇总 `retry 触发率 / llm rewrite 使用率 / task_type 分布 / source citation hit / retry-heavy samples`
 - CLI、评估脚本和 trace 分析脚本当前主要控制台输出已统一改成中文，便于直接阅读运行结果和调试信息
+- `eval/analyze_traces.py` 现在还会直接输出“下一步优化建议”，例如：
+  - 优先优化 generic summary 的首轮 query
+  - 优先检查 grounding / source normalization
+  - 优先分析最常触发 retry 的样本，而不是继续全局加规则
 - 对 `study_plan` 场景，主评估指标为：
   - `Expected Answer Hit`
   - `Forbidden Answer Hit`

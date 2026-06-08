@@ -245,6 +245,57 @@ def analyze_question_patterns(records: list[dict]) -> dict:
         "question_retry_stats": question_retry_stats,
     }
 
+def generate_optimization_suggestions(
+    cli_summary: dict,
+    eval_summary: dict,
+    eval_failures: dict,
+    question_patterns: dict,
+) -> list[str]:
+    """根据 trace 统计结果生成下一步优化建议。"""
+    suggestions: list[str] = []
+
+    # 1. summary 类问题如果 retry 很高，优先优化 generic summary 的首轮 query
+    summary_retry_candidates = [
+        item for item in question_patterns["question_retry_stats"]
+        if "summary" in item.get("task_types", []) and item["retry_rate"] >= 0.5
+    ]
+    if summary_retry_candidates:
+        suggestions.append(
+            "总结类问题的 Retry 率偏高，优先优化 generic summary 的首轮 query，减少“帮我总结这节课”这类问题对二轮补强的依赖。"
+        )
+
+    # 2. 如果 LLM retry 用得很多，说明规则型 query 已经不够，需要重点检查 rewrite 质量
+    if eval_summary["llm_retry_rate"] >= 0.3:
+        suggestions.append(
+            "LLM Retry 使用率偏高，建议优先检查 rewrite 生成的 query 质量，而不是继续扩大 Retry 触发范围。"
+        )
+
+    # 3. 如果来源命中率不高，优先看 grounding / citation
+    if eval_summary["source_hit_total"] > 0 and eval_summary["source_hit_rate"] < 0.8:
+        suggestions.append(
+            "来源引用命中率偏低，建议优先检查 grounding prompt、source normalization，以及 summary / qa 的 source 约束。"
+        )
+
+    # 4. 如果某些样本反复 retry，应该优先拿这些样本做定点优化
+    retry_heavy_samples = eval_failures["retry_heavy_samples"][:3]
+    if retry_heavy_samples and retry_heavy_samples[0]["retry_rate"] >= 0.5:
+        sample_ids = ", ".join(item["sample_id"] for item in retry_heavy_samples)
+        suggestions.append(
+            f"以下样本最常触发 Retry：{sample_ids}，建议优先做定点分析，而不是继续全局加规则。"
+        )
+
+    # 5. 如果 CLI 侧 retry 很低但 eval 侧 retry 高，说明真实交互和评估集分布差异大
+    if cli_summary["total"] > 0 and eval_summary["total"] > 0:
+        if eval_summary["retry_rate"] - cli_summary["retry_rate"] >= 0.2:
+            suggestions.append(
+                "评估集的 Retry 率明显高于 CLI 真实交互，建议检查 eval 样本是否更偏难题或泛问题，并针对评估集补检索策略。"
+            )
+
+    if not suggestions:
+        suggestions.append("当前 trace 没有暴露明显短板，下一步可以继续扩大评估覆盖或开始接 tracing 平台。")
+
+    return suggestions
+
 
 def print_counter(title: str, counter: Counter) -> None:
     """打印 Counter 统计结果，按照出现频率从高到低排序。"""
@@ -309,6 +360,10 @@ def print_eval_report(summary: dict, failures: dict, patterns: dict) -> None:
         ["question", "task_types", "retry_count", "retry_rate", "llm_retry_count"],
     )
 
+def print_optimization_suggestions(suggestions: list[str]) -> None:
+    print("\n=== 下一步优化建议 ===")
+    for item in suggestions:
+        print(f"- {item}")
 
 def main() -> None:
     """主函数，加载 CLI 和 Eval 的 trace 数据，进行分析，并打印报告。"""
@@ -322,9 +377,16 @@ def main() -> None:
     eval_summary = analyze_eval_traces(eval_records)
     eval_failures = analyze_eval_failures(eval_records)
     question_patterns = analyze_question_patterns(eval_records)
+    suggestions = generate_optimization_suggestions(
+        cli_summary,
+        eval_summary,
+        eval_failures,
+        question_patterns,
+    )
 
     print_cli_report(cli_summary)
     print_eval_report(eval_summary, eval_failures, question_patterns)
+    print_optimization_suggestions(suggestions)
 
 
 if __name__ == "__main__":

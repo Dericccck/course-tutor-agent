@@ -113,3 +113,135 @@ def test_analyze_eval_traces_summarizes_retry_modes_and_source_hits():
     assert summary["mode_counter"] == Counter({"hybrid": 2})
     assert summary["task_counter"] == Counter({"qa": 1, "summary": 1})
     assert summary["retry_samples"] == Counter({"qa-tool-use-001": 1})
+
+
+def test_analyze_eval_failures_and_question_patterns_rank_unstable_items():
+    analyze_traces = load_analyze_traces_module()
+    records = [
+        {
+            "sample_id": "summary-tool-use-001",
+            "mode": "hybrid",
+            "task_type": "summary",
+            "question": "帮我总结这节课",
+            "agent_debug": {
+                "retry_triggered": True,
+                "llm_retry_query": "tool use lesson summary",
+            },
+            "agent_eval": {
+                "source_citation_hit": False,
+            },
+        },
+        {
+            "sample_id": "summary-tool-use-001",
+            "mode": "hybrid",
+            "task_type": "summary",
+            "question": "帮我总结这节课",
+            "agent_debug": {
+                "retry_triggered": True,
+                "llm_retry_query": "tool use lesson summary",
+            },
+            "agent_eval": {
+                "source_citation_hit": True,
+            },
+        },
+        {
+            "sample_id": "qa-tool-use-001",
+            "mode": "hybrid",
+            "task_type": "qa",
+            "question": "tool use 是什么？",
+            "agent_debug": {
+                "retry_triggered": False,
+                "llm_retry_query": None,
+            },
+            "agent_eval": {
+                "source_citation_hit": True,
+            },
+        },
+    ]
+
+    failures = analyze_traces.analyze_eval_failures(records)
+    patterns = analyze_traces.analyze_question_patterns(records)
+
+    assert failures["retry_heavy_samples"][0]["sample_id"] == "summary-tool-use-001"
+    assert failures["retry_heavy_samples"][0]["retry_rate"] == 1.0
+    assert failures["llm_retry_heavy_samples"][0]["sample_id"] == "summary-tool-use-001"
+    assert failures["source_miss_samples"][0]["sample_id"] == "summary-tool-use-001"
+    assert patterns["question_retry_stats"][0]["question"] == "帮我总结这节课"
+    assert patterns["question_retry_stats"][0]["retry_rate"] == 1.0
+
+
+def test_generate_optimization_suggestions_returns_actionable_chinese_hints():
+    analyze_traces = load_analyze_traces_module()
+
+    cli_summary = {
+        "total": 2,
+        "retry_count": 0,
+        "llm_retry_count": 0,
+        "retry_rate": 0.0,
+        "llm_retry_rate": 0.0,
+        "task_counter": Counter({"qa": 2}),
+    }
+    eval_summary = {
+        "total": 4,
+        "retry_count": 2,
+        "llm_retry_count": 2,
+        "retry_rate": 0.5,
+        "llm_retry_rate": 0.5,
+        "source_hit_total": 4,
+        "source_hit_true": 2,
+        "source_hit_rate": 0.5,
+        "mode_counter": Counter({"hybrid": 4}),
+        "task_counter": Counter({"summary": 4}),
+        "retry_samples": Counter({"summary-tool-use-001": 2}),
+    }
+    eval_failures = {
+        "retry_heavy_samples": [
+            {
+                "sample_id": "summary-tool-use-001",
+                "task_type": "summary",
+                "retry_count": 2,
+                "retry_rate": 1.0,
+            }
+        ],
+        "llm_retry_heavy_samples": [
+            {
+                "sample_id": "summary-tool-use-001",
+                "task_type": "summary",
+                "llm_retry_count": 2,
+                "llm_retry_rate": 1.0,
+            }
+        ],
+        "source_miss_samples": [
+            {
+                "sample_id": "summary-tool-use-001",
+                "task_type": "summary",
+                "source_hit_false": 1,
+                "source_miss_rate": 0.5,
+            }
+        ],
+    }
+    question_patterns = {
+        "question_retry_stats": [
+            {
+                "question": "帮我总结这节课",
+                "task_types": ["summary"],
+                "retry_count": 2,
+                "retry_rate": 1.0,
+                "llm_retry_count": 2,
+                "llm_retry_rate": 1.0,
+            }
+        ]
+    }
+
+    suggestions = analyze_traces.generate_optimization_suggestions(
+        cli_summary,
+        eval_summary,
+        eval_failures,
+        question_patterns,
+    )
+
+    assert any("总结类问题的 Retry 率偏高" in item for item in suggestions)
+    assert any("LLM Retry 使用率偏高" in item for item in suggestions)
+    assert any("来源引用命中率偏低" in item for item in suggestions)
+    assert any("以下样本最常触发 Retry" in item for item in suggestions)
+    assert any("评估集的 Retry 率明显高于 CLI 真实交互" in item for item in suggestions)
