@@ -191,6 +191,27 @@ def test_build_retrieval_queries_includes_recent_focus_for_summary():
     ]
 
 
+def test_build_retrieval_queries_uses_generic_summary_queries_without_history_noise():
+    queries = agent.build_retrieval_queries(
+        "总结这个notebook",
+        task_type="summary",
+        memory={
+            "recent_focus": "最近在复习课程总结内容",
+            "recent_focus_history": [
+                "Tool use 与 agent tool calling",
+                "最近在复习课程总结内容",
+            ],
+        },
+    )
+
+    assert queries == [
+        "总结这个notebook",
+        "总结这个notebook notebook lesson 总结",
+        "课程 lesson notebook 总结",
+        "课程模块 lesson notebook 这节课讲什么",
+    ]
+
+
 def test_build_retrieval_queries_includes_recent_focus_for_study_plan():
     queries = agent.build_retrieval_queries(
         "如果我想重点学 RAG，再过渡到 Agentic RAG，应该怎么安排学习顺序？",
@@ -271,15 +292,22 @@ def test_should_retry_retrieval_uses_task_specific_thresholds():
 
 def test_should_retry_retrieval_treats_generic_summary_without_anchor_as_weak():
     two_chunks = [make_chunk("04 Tool Use 学习摘要"), make_chunk("05 Agentic RAG 学习摘要")]
+    four_chunks = [
+        make_chunk("04 Tool Use 学习摘要"),
+        make_chunk("05 Agentic RAG 学习摘要"),
+        make_chunk("07 Planning Design 学习摘要"),
+        make_chunk("13 Agent Memory 学习摘要"),
+    ]
 
     assert agent.should_retry_retrieval("帮我总结这节课", two_chunks, "summary") is True
     assert agent.should_retry_retrieval("帮我总结这个notebook", two_chunks, "summary") is True
+    assert agent.should_retry_retrieval("帮我总结这个notebook", four_chunks, "summary") is False
 
 
 def test_is_generic_summary_question_matches_broad_summary_patterns():
     assert agent.is_generic_summary_question("帮我总结这节课") is True
     assert agent.is_generic_summary_question("总结这个notebook") is True
-    assert agent.is_generic_summary_question("帮我总结 05-agentic-rag 这一节在讲什么") is True
+    assert agent.is_generic_summary_question("帮我总结 05-agentic-rag 这一节在讲什么") is False
 
 
 def test_build_retry_retrieval_queries_includes_goal_scope_and_recent_focus():

@@ -162,17 +162,19 @@ def should_retry_retrieval(
     """
     if not retrieved_chunks:
         return True
-    
+
     if task_type == "summary":
         if len(retrieved_chunks) < 2:
             return True
         if is_generic_summary_question(question) and detect_course_anchor(question) is None:
-            return True
+            # 首轮结果太少时仍然补强；如果首轮已经有足够结果，就不必强制 retry。
+            return len(retrieved_chunks) < 4
+
         return False
-    
+
     if task_type == "study_plan":
         return len(retrieved_chunks) < 3
-    
+
     return len(retrieved_chunks) < 2
 
 # 根据任务类型选择要放入 prompt 的检索结果数量和策略。对于总结类问题，我们可能只需要最相关的 3-4 条资料来生成高质量的总结；对于学习计划类问题，我们可能需要更多的资料来全面评估和安排学习路线；而对于一般的问答类问题，我们可能只需要最相关的 1-3 条资料来直接回答用户的问题。
@@ -306,7 +308,7 @@ def ask_course_agent(
                 else f"{question.strip()} agent course concept"
             ]
             + build_anchor_queries(question)
-            + build_memory_queries(task_type, memory=memory)
+            + build_memory_queries(question, task_type, memory=memory)
         )
         extra_retry_queries = [
             item for item in retry_queries
@@ -623,6 +625,10 @@ def is_generic_summary_question(question: str) -> bool:
         避免反而把检索引导到不相关的课程模块上去。
     """
     lowered = question.lower()
+    # 如果问题里已经带了明确课程锚点，就不要再按 generic summary 处理。
+    if detect_course_anchor(question) is not None:
+        return False
+
     generic_patterns = [
         "总结",
         "概述",
@@ -634,6 +640,44 @@ def is_generic_summary_question(question: str) -> bool:
         "lesson",
     ]
     return any(pattern in lowered for pattern in generic_patterns)
+
+def is_specific_focus(text: str) -> bool:
+    lowered = text.lower()
+    generic_values = {
+        "最近在复习课程总结内容",
+        "最近在学习课程问答主题",
+        "最近在规划学习路线",
+    }
+    if text in generic_values:
+        return False
+    return any(token in lowered for token in [
+        "tool use",
+        "agentic rag",
+        "planning",
+        "lesson",
+        "rag",
+        "memory",
+    ])
+
+def build_generic_summary_queries(
+    question: str,
+    memory: dict | None = None,
+) -> list[str]:
+    """为泛 summary 问题构造更像课程检索的首轮 query。"""
+    memory = memory or {}
+    recent_focus = memory.get("recent_focus", "").strip()
+    recent_focus_history = memory.get("recent_focus_history", [])
+
+    queries: list[str] = [
+        "课程 lesson notebook 总结",
+        "课程模块 lesson notebook 这节课讲什么",
+    ]
+
+    # 如果最近学习重点本身像课程主题，就把它作为更强的 summary 锚点。
+    if recent_focus and is_specific_focus(recent_focus):
+        queries.append(f"{recent_focus} lesson notebook 总结")
+
+    return dedupe_queries(queries)
 
 def dedupe_queries(queries: list[str]) -> list[str]: # 去重逻辑
     seen: set[str] = set()
@@ -670,6 +714,11 @@ def build_primary_queries(
     elif task_type == "summary":
         queries.append(f"{question.strip()} notebook lesson 总结")
 
+        # 对“帮我总结这节课”这类泛 summary 问题，首轮额外补课程型 query，
+        # 尽量在第一次检索就把 lesson/notebook 摘要拉上来，减少对 retry 的依赖。
+        if is_generic_summary_question(question):
+            queries.extend(build_generic_summary_queries(question, memory=memory))
+
     elif task_type == "study_plan":
         goal = (memory or {}).get("learning_goal", "").strip()
         if goal:
@@ -687,6 +736,7 @@ def build_anchor_queries(question: str) -> list[str]:
     return [course_anchor]
 
 def build_memory_queries(
+    question: str,
     task_type: str,
     memory: dict | None = None,
 ) -> list[str]:
@@ -711,10 +761,13 @@ def build_memory_queries(
             queries.append(f"{item} 学习顺序 学习路线")
 
     elif task_type == "summary":
-        if recent_focus:
-            queries.append(f"{recent_focus} lesson notebook 总结")
-        for item in recent_focus_tail:
-            queries.append(f"{item} lesson notebook 总结")
+        # generic summary 首轮已经走专门的 generic query 补强；
+        # 非 generic summary 再从 recent_focus 补上下文，避免旧主题过度主导。
+        if not is_generic_summary_question(question):
+            if recent_focus:
+                queries.append(f"{recent_focus} lesson notebook 总结")
+            for item in recent_focus_tail:
+                queries.append(f"{item} lesson notebook 总结")
 
     else:
         if recent_focus:
@@ -736,7 +789,7 @@ def build_retrieval_queries(
     queries: list[str] = []
     queries.extend(build_primary_queries(question, task_type, memory=memory))
     queries.extend(build_anchor_queries(question))
-    queries.extend(build_memory_queries(task_type, memory=memory))
+    queries.extend(build_memory_queries(question, task_type, memory=memory))
     return dedupe_queries(queries)
 
 def build_query_rewrite_prompt( # 小 prompt builder
@@ -841,7 +894,7 @@ def build_retry_retrieval_queries( # 触发了retry
         queries.append(f"{question.strip()} agent course concept")
 
     queries.extend(build_anchor_queries(question))
-    queries.extend(build_memory_queries(task_type, memory=memory))
+    queries.extend(build_memory_queries(question, task_type, memory=memory))
 
     
     if settings is not None and client is not None:
